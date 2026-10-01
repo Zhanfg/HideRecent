@@ -1,7 +1,13 @@
-# 系统框架（注入 system_server，隐藏最近任务的 hook 在这里）
+# Generic system_server layer (primary cross-ROM filtering)
 android
 system
-# ColorOS 桌面 / Quickstep（注入 launcher 进程，LockSettingActivity 等 hook）
-com.oplus.quickstep
+
+# AOSP / Launcher3 / Pixel Quickstep hosts
 com.android.launcher
+com.android.launcher3
+com.google.android.apps.nexuslauncher
+com.android.systemui
+
+# ColorOS / OPlus vendor enhancement layer
+com.oplus.quickstep
 com.oplus.launcher

@@ -8,91 +8,127 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * 注入 system_server（android 作用域）。
- * 参考 hideRecent / RocGwei：拦截 com.android.server.wm.RecentTasks.isVisibleRecentTask
- * 使指定包名的任务不出现在最近任务列表。
+ * Generic system_server recent-task filtering.
+ *
+ * The AOSP RecentTasks implementation is the primary cross-ROM layer. We hook both the visibility
+ * predicate and the final recent-task list builder. OEM launcher-specific hooks are only fallback
+ * layers when a vendor bypasses the standard ATMS recent-task result.
  */
 object SystemRecentHook {
-
     private const val TAG = "${Main.TAG}/sys"
-    private const val SNAPSHOT_REFRESH_SEC = 15L
+    private const val SNAPSHOT_REFRESH_SEC = 60L
     private val hiddenSnapshot = HiddenPackagesSnapshot()
     private val refreshStarted = AtomicBoolean(false)
     private val refreshExecutor = Executors.newSingleThreadScheduledExecutor { r ->
         Thread(r, "HideRecentTiles-sys-refresh").apply { isDaemon = true }
     }
+    @Volatile private var prefsListener: ((Set<String>) -> Unit)? = null
+    private var listDiagCount = 0
 
     fun hook(module: Main, cl: ClassLoader) {
-        // 目标类在部分 ROM 上是 RecentTasks 内部类，回退 Task 基类
-        val recentTasks = loadClass(cl,
+        val recentTasks = loadClass(
+            cl,
             "com.android.server.wm.RecentTasks",
-            "com.android.server.wm.RecentTasks\$1"
+            "com.android.server.am.RecentTasks"
         ) ?: run {
-            module.log(Log.ERROR, TAG, "RecentTasks not found")
+            module.log(Log.ERROR, TAG, "AOSP RecentTasks not found")
             return
         }
 
         var count = 0
-        // 单参重载（AOSP）
+        // Android 10-current AOSP path. Some OEM releases carry extra parameters, so install both
+        // common arities when present.
         count += hookBool(module, recentTasks, "isVisibleRecentTask", 1)
-        // 双参重载（Vivo / 部分 OEM 直接调用）
         count += hookBool(module, recentTasks, "isVisibleRecentTask", 2)
+
+        // Stronger generic fallback: filter the final ArrayList<RecentTaskInfo>. This also catches
+        // callers that reach RecentTasks but bypass/replace the visibility predicate internally.
+        count += hookRecentTasksImpl(module, recentTasks)
+
+        registerPrefsListener(module)
+        runCatching { hiddenSnapshot.replace(module.hiddenPackages) }
+            .onFailure { module.log(Log.WARN, TAG, "initial snapshot failed: ${it.message}") }
         startSnapshotRefresh(module)
-        module.log(Log.INFO, TAG, "isVisibleRecentTask hooks = $count")
+        module.log(Log.INFO, TAG, "generic system recents hooks=$count")
     }
 
-    /** 拦截返回 boolean 的方法：若目标任务包名在隐藏集合内则强制返回 false */
+    fun prepareHotReload(module: Main) {
+        prefsListener = null
+        runCatching { refreshExecutor.shutdownNow() }
+            .onFailure { module.log(Log.WARN, TAG, "hot-reload executor shutdown failed: ${it.message}") }
+    }
+
+    private fun registerPrefsListener(module: Main) {
+        if (prefsListener != null) return
+        val listener: (Set<String>) -> Unit = { hidden -> hiddenSnapshot.replace(hidden) }
+        prefsListener = listener
+        module.addHiddenListener(listener)
+    }
+
     private fun hookBool(module: Main, cls: Class<*>, name: String, argCount: Int): Int {
         val method = findMethod(cls, name, argCount) ?: return 0
-        module.hook(method).setId("$name/$argCount").setExceptionMode(
-            XposedInterface.ExceptionMode.PROTECTIVE
-        ).intercept { chain ->
-            HookDecision.evaluateOrProceed(
-                proceed = { chain.proceed() },
-                onError = { module.log(Log.WARN, TAG, "hook fallback: ${it.message}") }
-            ) {
-                val hidden = hiddenSnapshot.get()
-                if (hidden.isNotEmpty()) {
-                    val pkg = packageNameOf(chain.args)
-                    if (pkg != null && pkg in hidden) {
-                        return@evaluateOrProceed false
+        runCatching { module.deoptimize(method) }
+        module.hook(method)
+            .setId("sys/$name/$argCount")
+            .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+            .intercept { chain ->
+                HookDecision.evaluateOrProceed(
+                    proceed = { chain.proceed() },
+                    onError = { module.log(Log.WARN, TAG, "visibility hook fallback: ${it.message}") }
+                ) {
+                    val hidden = hiddenSnapshot.get()
+                    if (hidden.isNotEmpty()) {
+                        val task = chain.args.firstOrNull()
+                        if (RecentTaskPackages.shouldHide(task, hidden)) {
+                            return@evaluateOrProceed false
+                        }
                     }
+                    null
                 }
-                null
             }
-        }
         return 1
+    }
+
+    private fun hookRecentTasksImpl(module: Main, cls: Class<*>): Int {
+        val methods = cls.declaredMethods.filter { m ->
+            m.name == "getRecentTasksImpl" &&
+                java.util.List::class.java.isAssignableFrom(m.returnType)
+        }
+        if (methods.isEmpty()) return 0
+
+        methods.forEachIndexed { index, method ->
+            method.isAccessible = true
+            runCatching { module.deoptimize(method) }
+            module.hook(method)
+                .setId("sys/getRecentTasksImpl/$index/${method.parameterCount}")
+                .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                .intercept { chain ->
+                    val result = chain.proceed()
+                    val hidden = hiddenSnapshot.get()
+                    if (hidden.isNotEmpty()) {
+                        val removed = RecentTaskListFilter.filterInPlace(result, hidden)
+                        val n = listDiagCount
+                        if (removed > 0 || n < 4) {
+                            listDiagCount = n + 1
+                            module.log(
+                                Log.INFO,
+                                TAG,
+                                "getRecentTasksImpl#$n removed=$removed hidden=${hidden.size}"
+                            )
+                        }
+                    }
+                    result
+                }
+        }
+        return methods.size
     }
 
     private fun startSnapshotRefresh(module: Main) {
         if (!refreshStarted.compareAndSet(false, true)) return
         refreshExecutor.scheduleWithFixedDelay({
-            runCatching {
-                hiddenSnapshot.replace(module.hiddenPackages)
-            }.onFailure {
-                module.log(Log.WARN, TAG, "snapshot refresh failed: ${it.message}")
-            }
-        // ponytail: 首次延迟一个周期,避免开机早期从 system_server 发 provider query
-        // 去冷启动模块进程(可能阻塞 system_server)。升级路径:改为监听广播、彻底去掉轮询。
+            runCatching { hiddenSnapshot.replace(module.hiddenPackages) }
+                .onFailure { module.log(Log.WARN, TAG, "snapshot refresh failed: ${it.message}") }
         }, SNAPSHOT_REFRESH_SEC, SNAPSHOT_REFRESH_SEC, TimeUnit.SECONDS)
-    }
-
-    /** 从方法入参里的 Task 对象取基础 Intent 的包名 */
-    private fun packageNameOf(args: List<Any?>): String? {
-        val task = args.firstOrNull() ?: return null
-        return try {
-            val m = task.javaClass.getMethod("getBaseIntent")
-            val intent = m.invoke(task) as? android.content.Intent ?: return null
-            intent.component?.packageName ?: intent.`package`
-        } catch (t: Throwable) {
-            try {
-                // 部分 ROM 用 mBaseIntent 字段
-                val f = task.javaClass.getDeclaredField("mBaseIntent").apply { isAccessible = true }
-                (f.get(task) as? android.content.Intent)?.component?.packageName
-            } catch (_: Throwable) {
-                null
-            }
-        }
     }
 
     private fun findMethod(cls: Class<*>, name: String, argCount: Int): Method? =
@@ -100,11 +136,8 @@ object SystemRecentHook {
             ?.apply { isAccessible = true }
 
     private fun loadClass(cl: ClassLoader, vararg names: String): Class<*>? {
-        for (n in names) {
-            try {
-                return cl.loadClass(n)
-            } catch (_: Throwable) {
-            }
+        for (name in names) {
+            try { return cl.loadClass(name) } catch (_: Throwable) { }
         }
         return null
     }
