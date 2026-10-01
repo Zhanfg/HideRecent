@@ -19,20 +19,20 @@ jobs:
 
       - name: Download and verify uploaded patch
         env:
-          PATCH_URL: 'https://sdmntprwestus.oaiusercontent.com/files/00000000-2668-8230-ba3e-8419370691f6/raw?se=2026-10-01T04%3A31%3A49Z&sp=r&sv=2026-02-06&sr=b&scid=dbe435d9-a6a6-5938-b976-caad7db9f980&skoid=456594af-533f-44ef-9bdc-35ea2f9daee5&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-01T03%3A22%3A48Z&ske=2026-10-02T03%3A22%3A48Z&sks=b&skv=2026-02-06&sig=w8HJckjev/HNmtvyLdBwWOFcqk9Snm8aYEGEEqWtzWA%3D'
+          PATCH_URL: 'https://sdmntprwestus.oaiusercontent.com/files/00000000-8650-8230-8359-6d8ae6429d30/raw?se=2026-10-01T04%3A34%3A45Z&sp=r&sv=2026-02-06&sr=b&scid=e65a56ff-d888-5d08-a8a5-9a79b2e5a9ec&skoid=456594af-533f-44ef-9bdc-35ea2f9daee5&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-01T04%3A21%3A18Z&ske=2026-10-02T04%3A21%3A18Z&sks=b&skv=2026-02-06&sig=Ok5%2B%2B76Jr2LOGaOVuyqu8gInVdwbpDoKaCKfBHvAvPA%3D'
         run: |
           set -euo pipefail
           curl -fL --retry 3 "$PATCH_URL" -o /tmp/patch.zip
           echo "05cb444af4af9219d0123d73436928524f53081f6c4e2b56ff1f01eaef51b67b  /tmp/patch.zip" | sha256sum -c -
 
-      - name: Apply patch and commit
+      - name: Apply non-workflow patch files and commit
         run: |
           set -euo pipefail
           unzip -o /tmp/patch.zip -d .
-          rm -f .github/workflows/apply-uploaded-patch.yml
+          git checkout HEAD -- .github/workflows/android.yml .github/workflows/apply-uploaded-patch.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --quiet && { echo "No patch changes detected"; exit 1; }
-          git commit -m "[feat] apply v26.10.1-generic1 universal recents patch" -m "Tests: uploaded ZIP SHA-256 verified before extraction."
+          git commit -m "[feat] apply v26.10.1-generic1 universal recents patch" -m "Tests: uploaded ZIP SHA-256 verified before extraction; workflow file applied separately."
           git push origin HEAD:feat/generic-recents-filter
