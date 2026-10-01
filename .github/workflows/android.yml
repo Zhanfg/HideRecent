@@ -30,11 +30,11 @@ jobs:
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-      - name: Set up Gradle 8.9
+          sdkmanager "platform-tools" "platforms;android-37" "build-tools;36.0.0"
+      - name: Set up Gradle 9.6.0
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "9.6.0"
       - name: Run unit tests
         run: gradle :app:testDebugUnitTest --no-daemon --stacktrace
       - name: Build debug APK
