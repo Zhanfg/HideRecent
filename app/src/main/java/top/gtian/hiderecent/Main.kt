@@ -6,6 +6,8 @@ import android.content.SharedPreferences
 import android.os.SystemClock
 import android.util.Log
 import io.github.libxposed.api.XposedModule
+import io.github.libxposed.api.XposedModuleInterface.HotReloadedParam
+import io.github.libxposed.api.XposedModuleInterface.HotReloadingParam
 import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
 import io.github.libxposed.api.XposedModuleInterface.SystemServerStartingParam
@@ -96,6 +98,9 @@ class Main : XposedModule() {
     @Volatile
     private var remotePrefsRef: SharedPreferences? = null
 
+    @Volatile
+    private var remotePrefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
+
     /** UI 勾选的隐藏包名集合（每次 hook 调用时读取，改配置即时生效） */
     val hiddenPackages: Set<String>
         get() = readHiddenPackages()
@@ -116,6 +121,48 @@ class Main : XposedModule() {
         if (param.packageName !in LAUNCHER_PKGS) return
         runCatching { LauncherRecentHook.hook(this, param) }
             .onFailure { log(Log.ERROR, TAG, "launcher hook failed", it) }
+    }
+
+    /** API 102 module-code hot reload: detach the old generation before replacing hooks. */
+    override fun onHotReloading(param: HotReloadingParam): Boolean {
+        // Keep only classloader-neutral state across generations.
+        param.setSavedInstanceState(cachedHidden?.joinToString(",") ?: "")
+        runCatching { LauncherRecentHook.prepareHotReload(this) }
+        runCatching { SystemRecentHook.prepareHotReload(this) }
+        detachRemotePrefsListener()
+        log(Log.INFO, TAG, "hot reload: old generation detached")
+        return true
+    }
+
+    override fun onHotReloaded(param: HotReloadedParam) {
+        (param.getSavedInstanceState() as? String)?.let { raw ->
+            cachedHidden = parse(raw)
+            cachedAt = SystemClock.elapsedRealtime()
+        }
+
+        val oldHandles = param.oldHookHandles.toList()
+        val loader = oldHandles.asSequence()
+            .mapNotNull { it.executable.declaringClass.classLoader }
+            .firstOrNull()
+            ?: if (param.isSystemServer) ClassLoader.getSystemClassLoader()
+            else currentContext()?.classLoader
+
+        // Remove old-generation callbacks first so the previous module ClassLoader can be released.
+        oldHandles.forEach { runCatching { it.unhook() } }
+
+        if (loader != null) {
+            if (param.isSystemServer) {
+                runCatching { SystemRecentHook.hook(this, loader) }
+                    .onFailure { log(Log.ERROR, TAG, "hot reload system rehook failed", it) }
+            } else if (param.processName.substringBefore(':') in LAUNCHER_PKGS) {
+                runCatching { LauncherRecentHook.hook(this, loader) }
+                    .onFailure { log(Log.ERROR, TAG, "hot reload launcher rehook failed", it) }
+            }
+        } else {
+            log(Log.ERROR, TAG, "hot reload: target classloader unavailable")
+        }
+
+        log(Log.INFO, TAG, "hot reload complete; oldHandles=${oldHandles.size}")
     }
 
     /**
@@ -296,13 +343,27 @@ class Main : XposedModule() {
                 getRemotePreferences(PREFS_NAME)?.also { prefs ->
                     remotePrefsRef = prefs
                     runCatching {
-                        prefs.registerOnSharedPreferenceChangeListener { _, _ -> cachedAt = 0L }
+                        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+                            cachedAt = 0L
+                        }
+                        remotePrefsListener = listener
+                        prefs.registerOnSharedPreferenceChangeListener(listener)
                     }
                 }
             } catch (_: Throwable) {
                 null
             }
         }
+    }
+
+    private fun detachRemotePrefsListener() {
+        val prefs = remotePrefsRef
+        val listener = remotePrefsListener
+        if (prefs != null && listener != null) {
+            runCatching { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
+        remotePrefsListener = null
+        remotePrefsRef = null
     }
 
     /** 逗号分隔字符串 → 包名集合；null / 空串都表示「合法的空名单」 */

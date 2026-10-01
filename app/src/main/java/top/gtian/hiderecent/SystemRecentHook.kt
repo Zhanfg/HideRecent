@@ -41,6 +41,12 @@ object SystemRecentHook {
         module.log(Log.INFO, TAG, "isVisibleRecentTask hooks = $count")
     }
 
+    /** Stop the old generation's scheduler before API 102 replaces its hooks. */
+    fun prepareHotReload(module: Main) {
+        runCatching { refreshExecutor.shutdownNow() }
+            .onFailure { module.log(Log.WARN, TAG, "hot reload executor cleanup failed: ${it.message}") }
+    }
+
     /** 拦截返回 boolean 的方法：若目标任务包名在隐藏集合内则强制返回 false */
     private fun hookBool(module: Main, cls: Class<*>, name: String, argCount: Int): Int {
         val method = findMethod(cls, name, argCount) ?: return 0

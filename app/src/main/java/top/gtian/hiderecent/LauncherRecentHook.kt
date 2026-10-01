@@ -51,8 +51,9 @@ object LauncherRecentHook {
     /** 诊断计数器：限制前 N 次调用打日志，避免刷屏 */
     private var diagCount = 0
 
-    fun hook(module: Main, param: PackageLoadedParam) {
-        val loader = param.defaultClassLoader
+    fun hook(module: Main, param: PackageLoadedParam) = hook(module, param.defaultClassLoader)
+
+    fun hook(module: Main, loader: ClassLoader) {
         var count = 0
 
         // 主 hook：OplusRecentTasksFilter.filterTask(GroupTask): boolean
@@ -80,6 +81,21 @@ object LauncherRecentHook {
 
     /** 广播接收器强引用，避免被 GC 回收导致收不到广播 */
     private var prefsReceiver: BroadcastReceiver? = null
+    private var receiverContext: Context? = null
+
+    /** Release process-local resources owned by the old module generation. */
+    fun prepareHotReload(module: Main) {
+        val ctx = receiverContext
+        val receiver = prefsReceiver
+        if (ctx != null && receiver != null) {
+            runCatching { ctx.unregisterReceiver(receiver) }
+                .onFailure { module.log(Log.WARN, TAG, "hot reload receiver cleanup failed: ${it.message}") }
+        }
+        prefsReceiver = null
+        receiverContext = null
+        runCatching { refreshExecutor.shutdownNow() }
+        runCatching { periodicExecutor.shutdownNow() }
+    }
 
     /**
      * 动态注册配置变更接收器。
@@ -121,6 +137,7 @@ object LauncherRecentHook {
         }
         if (ok) {
             prefsReceiver = receiver
+            receiverContext = ctx
             module.log(Log.INFO, TAG, "prefs receiver registered")
         }
     }

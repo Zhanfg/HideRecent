@@ -6,3 +6,4 @@ description=自定义最近任务应用显示/隐藏（ColorOS）
 minApiVersion=102
 targetApiVersion=102
 staticScope=false
+autoHotReload=true
