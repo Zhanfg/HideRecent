@@ -82,7 +82,7 @@ class Main : XposedModule() {
     /** API 102 module-code hot reload. */
     override fun onHotReloading(param: HotReloadingParam): Boolean {
         // Only classloader-neutral data may cross the reload boundary.
-        param.savedInstanceState = cachedHidden?.joinToString(",") ?: ""
+        param.setSavedInstanceState(cachedHidden?.joinToString(",") ?: "")
         runCatching { LauncherRecentHook.prepareHotReload(this) }
         runCatching { SystemRecentHook.prepareHotReload(this) }
         detachRemotePrefsListener()
@@ -92,7 +92,7 @@ class Main : XposedModule() {
     }
 
     override fun onHotReloaded(param: HotReloadedParam) {
-        (param.savedInstanceState as? String)?.let { raw ->
+        (param.getSavedInstanceState() as? String)?.let { raw ->
             val restored = parse(raw)
             cachedHidden = restored
             cachedAt = SystemClock.elapsedRealtime()
