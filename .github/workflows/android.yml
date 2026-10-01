@@ -30,7 +30,7 @@ jobs:
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "platforms;android-37" "build-tools;36.0.0"
+          sdkmanager "platform-tools" "platforms;android-37.0" "build-tools;36.0.0"
       - name: Set up Gradle 9.6.0
         uses: gradle/actions/setup-gradle@v4
         with:
