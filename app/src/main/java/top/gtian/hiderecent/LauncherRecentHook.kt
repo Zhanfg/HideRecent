@@ -43,30 +43,33 @@ object LauncherRecentHook {
 
         var count = 0
 
-        // ColorOS/OPlus already exposes a native filtering point. Prefer that fast path and do not
-        // stack the generic Launcher3 list hooks on top of it: double-filtering the same task list
-        // creates unnecessary reflection/allocation pressure in the launcher hot path.
-        val oplusHooks = hookFilterTaskInfo(module, loader) + hookFilterTask(module, loader)
+        // On ColorOS/OPlus, filter the task list once when it is loaded. Do not hook the vendor
+        // per-card filter predicates unless this list-level path is unavailable: those predicates
+        // can be called repeatedly during Overview gestures/animations and any interceptor there
+        // directly steals frame time from the launcher.
+        val oplusListHooks = hookOplusTaskList(module, loader)
+        val oplusPredicateHooks = if (oplusListHooks == 0) {
+            hookFilterTaskInfo(module, loader) + hookFilterTask(module, loader)
+        } else {
+            0
+        }
+        val oplusHooks = oplusListHooks + oplusPredicateHooks
         count += oplusHooks
+
         if (oplusHooks == 0) {
             count += hookAospRecentTasksList(module, loader)
-        }
-
-        count += hookDiag(module, loader)
-        if (oplusHooks > 0) {
-            count += hookRecentsLoad(module, loader)
         }
 
         if (count == 0) return
 
         registerPrefsListener(module)
         registerPrefsReceiver(module)
-
-        // RemotePreferences listener + signed broadcast + recents-load refresh already cover
-        // configuration updates. The old periodic scheduler kept an extra launcher thread alive
-        // permanently and is unnecessary here.
         refreshSnapshotAsync(module, "init")
-        module.log(Log.INFO, TAG, "recents-host hooks=$count oplus=$oplusHooks")
+        module.log(
+            Log.INFO,
+            TAG,
+            "recents-host hooks=$count oplusList=$oplusListHooks oplusPredicate=$oplusPredicateHooks"
+        )
     }
 
 
@@ -275,36 +278,42 @@ object LauncherRecentHook {
     }
 
     /**
-     * Captures the live RecentTasksList object. It is then used to invalidate launcher task caches
-     * immediately after a preference change, so an already-open Overview refreshes without restart.
+     * ColorOS/OPlus fast path: filter the loaded task collection once, before Overview starts
+     * presenting/animating cards. This deliberately avoids OplusRecentTasksFilter.filterTask*,
+     * because those predicate methods may participate in gesture-time UI work.
      */
-    private fun hookRecentsLoad(module: Main, cl: ClassLoader): Int {
+    private fun hookOplusTaskList(module: Main, cl: ClassLoader): Int {
         val cls = try { cl.loadClass("com.android.quickstep.OplusRecentTasksListImpl") }
         catch (_: Throwable) { return 0 }
-        val methods = cls.declaredMethods.filter { it.name == "loadTasksInBackground" }
+
+        val methods = cls.declaredMethods.filter { method ->
+            method.name == "loadTasksInBackground" &&
+                java.util.List::class.java.isAssignableFrom(method.returnType)
+        }
         if (methods.isEmpty()) return 0
+
         methods.forEachIndexed { index, method ->
             method.isAccessible = true
             module.hook(method)
-                .setId("recentsLoad/$index/${method.parameterCount}")
+                .setId("oplus/loadTasks/$index/${method.parameterCount}")
                 .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
                 .intercept { chain ->
-                    HookDecision.evaluateOrProceed(
-                        proceed = { chain.proceed() },
-                        onError = { module.log(Log.WARN, TAG, "recents-load fallback: ${it.message}") }
-                    ) {
-                        chain.thisObject?.let { recentTasksRef = WeakReference(it) }
-                        registerPrefsReceiver(module)
-                        if (Looper.myLooper() == Looper.getMainLooper()) {
-                            refreshSnapshotAsync(module, "recents-load")
-                        } else {
-                            refreshSnapshotNow(module, "recents-load")
+                    chain.thisObject?.let { recentTasksRef = WeakReference(it) }
+                    registerPrefsReceiver(module)
+
+                    val result = chain.proceed()
+                    val hidden = hiddenSnapshot.get()
+                    if (hidden.isNotEmpty()) {
+                        val removed = RecentTaskListFilter.filterInPlace(result, hidden)
+                        if (removed > 0) {
+                            module.log(Log.INFO, TAG, "OPlus task list filtered=$removed")
                         }
-                        null
                     }
+                    result
                 }
         }
-        module.log(Log.INFO, TAG, "hooked OplusRecentTasksListImpl.loadTasksInBackground x${methods.size}")
+
+        module.log(Log.INFO, TAG, "hooked OPlus task-list load x${methods.size}")
         return methods.size
     }
 
