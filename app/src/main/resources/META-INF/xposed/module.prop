@@ -1,6 +1,6 @@
 name=最近任务隐藏
-version=v26.10.1-generic1
-versionCode=2026100101
+version=v26.10.1-generic1-hotfix1
+versionCode=2026100102
 author=TESE
 description=通用 Android 最近任务隐藏（AOSP/Launcher3 + OEM 兼容增强）
 minApiVersion=102
