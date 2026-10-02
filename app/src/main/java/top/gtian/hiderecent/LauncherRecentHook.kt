@@ -14,8 +14,6 @@ import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
 import java.lang.ref.WeakReference
 import java.lang.reflect.Method
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Generic Launcher3/Quickstep recent-task filtering with OEM extensions.
@@ -25,17 +23,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object LauncherRecentHook {
     private const val TAG = "${Main.TAG}/launch"
-    private const val SNAPSHOT_REFRESH_SEC = 60L
-
     private val hiddenSnapshot = HiddenPackagesSnapshot()
     private val refreshExecutor = Executors.newSingleThreadExecutor { r ->
         Thread(r, "HideRecentTiles-launch-refresh").apply { isDaemon = true }
     }
-    private val periodicStarted = AtomicBoolean(false)
-    private val periodicExecutor = Executors.newSingleThreadScheduledExecutor { r ->
-        Thread(r, "HideRecentTiles-launch-periodic").apply { isDaemon = true }
-    }
-
     @Volatile private var recentTasksRef: WeakReference<Any>? = null
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
     @Volatile private var prefsReceiver: BroadcastReceiver? = null
@@ -51,19 +42,31 @@ object LauncherRecentHook {
             .onFailure { module.log(Log.WARN, TAG, "initial snapshot failed: ${it.message}") }
 
         var count = 0
-        count += hookAospRecentTasksList(module, loader) // portable Launcher3/Quickstep path
-        count += hookFilterTaskInfo(module, loader)      // ColorOS 16+ enhancement
-        count += hookFilterTask(module, loader)          // older ColorOS enhancement
+
+        // ColorOS/OPlus already exposes a native filtering point. Prefer that fast path and do not
+        // stack the generic Launcher3 list hooks on top of it: double-filtering the same task list
+        // creates unnecessary reflection/allocation pressure in the launcher hot path.
+        val oplusHooks = hookFilterTaskInfo(module, loader) + hookFilterTask(module, loader)
+        count += oplusHooks
+        if (oplusHooks == 0) {
+            count += hookAospRecentTasksList(module, loader)
+        }
+
         count += hookDiag(module, loader)
-        count += hookRecentsLoad(module, loader)         // OPlus cache capture fallback
+        if (oplusHooks > 0) {
+            count += hookRecentsLoad(module, loader)
+        }
 
         if (count == 0) return
 
         registerPrefsListener(module)
         registerPrefsReceiver(module)
-        startPeriodicRefresh(module)
+
+        // RemotePreferences listener + signed broadcast + recents-load refresh already cover
+        // configuration updates. The old periodic scheduler kept an extra launcher thread alive
+        // permanently and is unnecessary here.
         refreshSnapshotAsync(module, "init")
-        module.log(Log.INFO, TAG, "recents-host hooks=$count")
+        module.log(Log.INFO, TAG, "recents-host hooks=$count oplus=$oplusHooks")
     }
 
 
@@ -88,7 +91,6 @@ object LauncherRecentHook {
         }
         loadMethods.forEachIndexed { index, method ->
             method.isAccessible = true
-            runCatching { module.deoptimize(method) }
             module.hook(method)
                 .setId("aosp/loadTasks/$index/${method.parameterCount}")
                 .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
@@ -115,7 +117,6 @@ object LauncherRecentHook {
         }
         runningMethods.forEachIndexed { index, method ->
             method.isAccessible = true
-            runCatching { module.deoptimize(method) }
             module.hook(method)
                 .setId("aosp/getRunningTasks/$index")
                 .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
@@ -160,7 +161,6 @@ object LauncherRecentHook {
         prefsListener = null
         recentTasksRef = null
         runCatching { refreshExecutor.shutdownNow() }
-        runCatching { periodicExecutor.shutdownNow() }
     }
 
     /**
@@ -183,7 +183,6 @@ object LauncherRecentHook {
 
         methods.forEachIndexed { index, method ->
             method.isAccessible = true
-            runCatching { module.deoptimize(method) }
             module.hook(method)
                 .setId("filterTaskInfo/$index/${method.parameterCount}")
                 .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
@@ -198,11 +197,11 @@ object LauncherRecentHook {
                             (it?.javaClass?.name?.contains("GroupedTaskInfo") == true) ||
                                 (it?.javaClass?.name?.contains("GroupedRecentTaskInfo") == true)
                         }
-                        val packages = RecentTaskPackages.collect(grouped)
-                        val hide = packages.any(hidden::contains)
+                        val hide = RecentTaskPackages.shouldHide(grouped, hidden)
                         val n = groupedDiagCount
-                        if (n < 12) {
+                        if (n < 6) {
                             groupedDiagCount = n + 1
+                            val packages = RecentTaskPackages.collect(grouped)
                             module.log(
                                 Log.INFO, TAG,
                                 "filterTaskInfo#$n pkgs=${packages.take(4)} hidden=${hidden.size} decision=${if (hide) "FILTER" else "KEEP"}"
@@ -228,7 +227,6 @@ object LauncherRecentHook {
 
         methods.forEachIndexed { index, method ->
             method.isAccessible = true
-            runCatching { module.deoptimize(method) }
             module.hook(method)
                 .setId("filterTask/$index")
                 .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
@@ -239,11 +237,11 @@ object LauncherRecentHook {
                     ) {
                         val hidden = hiddenSnapshot.get()
                         val group = chain.args.firstOrNull()
-                        val packages = RecentTaskPackages.collect(group)
-                        val hide = packages.any(hidden::contains)
+                        val hide = RecentTaskPackages.shouldHide(group, hidden)
                         val n = legacyDiagCount
-                        if (n < 6) {
+                        if (n < 4) {
                             legacyDiagCount = n + 1
+                            val packages = RecentTaskPackages.collect(group)
                             module.log(Log.INFO, TAG, "filterTask#$n pkgs=${packages.take(4)} hidden=${hidden.size}")
                         }
                         if (hide) true else null
@@ -287,7 +285,6 @@ object LauncherRecentHook {
         if (methods.isEmpty()) return 0
         methods.forEachIndexed { index, method ->
             method.isAccessible = true
-            runCatching { module.deoptimize(method) }
             module.hook(method)
                 .setId("recentsLoad/$index/${method.parameterCount}")
                 .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
@@ -396,13 +393,6 @@ object LauncherRecentHook {
         }.onFailure {
             module.log(Log.WARN, TAG, "snapshot refresh failed($reason): ${it.message}")
         }
-    }
-
-    private fun startPeriodicRefresh(module: Main) {
-        if (!periodicStarted.compareAndSet(false, true)) return
-        periodicExecutor.scheduleWithFixedDelay({
-            refreshSnapshotNow(module, "periodic")
-        }, SNAPSHOT_REFRESH_SEC, SNAPSHOT_REFRESH_SEC, TimeUnit.SECONDS)
     }
 
     private fun currentLauncherContext(): Context? = try {

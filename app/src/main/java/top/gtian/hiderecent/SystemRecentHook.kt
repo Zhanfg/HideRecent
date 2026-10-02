@@ -67,7 +67,6 @@ object SystemRecentHook {
 
     private fun hookBool(module: Main, cls: Class<*>, name: String, argCount: Int): Int {
         val method = findMethod(cls, name, argCount) ?: return 0
-        runCatching { module.deoptimize(method) }
         module.hook(method)
             .setId("sys/$name/$argCount")
             .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
@@ -98,7 +97,6 @@ object SystemRecentHook {
 
         methods.forEachIndexed { index, method ->
             method.isAccessible = true
-            runCatching { module.deoptimize(method) }
             module.hook(method)
                 .setId("sys/getRecentTasksImpl/$index/${method.parameterCount}")
                 .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)

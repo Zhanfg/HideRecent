@@ -35,8 +35,8 @@ android {
         applicationId = "top.gtian.hiderecent"
         minSdk = 29
         targetSdk = 34
-        versionCode = 2026100101
-        versionName = "v26.10.1-generic1"
+        versionCode = 2026100102
+        versionName = "v26.10.1-generic1-hotfix1"
     }
 
     buildTypes {
