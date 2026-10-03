@@ -24,6 +24,11 @@ class LauncherStabilityActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(LauncherStabilityPrefs.PREFS_NAME, MODE_PRIVATE)
 
         bind(
+            findViewById(R.id.switchHapticEffects),
+            LauncherStabilityPrefs.KEY_HAPTIC_EFFECTS,
+            prefs
+        )
+        bind(
             findViewById(R.id.switchHideTaskTitle),
             LauncherStabilityPrefs.KEY_HIDE_TASK_TITLE,
             prefs
