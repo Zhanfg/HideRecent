@@ -3,6 +3,7 @@ package top.gtian.hiderecent
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Handler
+import android.os.SystemClock
 import android.os.Looper
 import android.util.Log
 import android.view.View
@@ -35,6 +36,8 @@ object LauncherStabilityHook {
     @Volatile private var config = Config()
     @Volatile private var remotePrefs: SharedPreferences? = null
     @Volatile private var prefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
+    @Volatile private var lastDismissStartHapticAt = 0L
+    @Volatile private var lastDismissTerminalHapticAt = 0L
 
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
     private val headers = CopyOnWriteArrayList<WeakReference<Any>>()
@@ -92,6 +95,8 @@ object LauncherStabilityHook {
         headers.clear()
         clearPanels.clear()
         originalVisibility.clear()
+        lastDismissStartHapticAt = 0L
+        lastDismissTerminalHapticAt = 0L
     }
 
     private fun attachPrefs(module: Main) {
@@ -254,18 +259,33 @@ object LauncherStabilityHook {
                 ?.apply { isAccessible = true }
         }.getOrNull()
 
+        val softTerminalHaptic = runCatching {
+            loader.loadClass("com.android.common.util.ya")
+                .declaredMethods
+                .firstOrNull { method ->
+                    method.name == "c" &&
+                        method.parameterTypes.contentEquals(
+                            arrayOf(
+                                Context::class.java,
+                                Int::class.javaPrimitiveType,
+                                Long::class.javaPrimitiveType,
+                                Boolean::class.javaPrimitiveType
+                            )
+                        )
+                }
+                ?.apply { isAccessible = true }
+        }.getOrNull()
+
         val appFeatureUtils = runCatching {
-            val cls = loader.loadClass("com.android.common.util.AppFeatureUtils")
-            val instance = cls.getField("INSTANCE").get(null)
-            val method = cls.getMethod("isSupportKillProgramWave")
+            val featureCls = loader.loadClass("com.android.common.util.AppFeatureUtils")
+            val instance = featureCls.getField("INSTANCE").get(null)
+            val method = featureCls.getMethod("isSupportKillProgramWave")
             Pair(instance, method)
         }.getOrNull()
 
         var count = 0
 
-        // 1) Horizontal stacked-recents scrolling:
-        //    exact runtime equivalent of replacing needVibrateWhenScroll() with
-        //    abs(mScroller.getCurrVelocity()) > mFastFlingVelocity.
+        // 1) Horizontal stacked-recents scrolling: preserve the proven hotfix3 gate.
         cls.declaredMethods
             .filter {
                 it.name == "needVibrateWhenScroll" &&
@@ -279,38 +299,61 @@ object LauncherStabilityHook {
                         .setId("launcher17312/haptic/nativeScrollGate/$index")
                         .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
                         .intercept { chain ->
-                            if (!config.hapticEffects) {
-                                return@intercept chain.proceed()
-                            }
-
-                            val host = chain.thisObject
-                                ?: return@intercept chain.proceed()
-
+                            if (!config.hapticEffects) return@intercept chain.proceed()
+                            val host = chain.thisObject ?: return@intercept chain.proceed()
                             val velocity = readScrollerVelocity(host)
                                 ?: return@intercept chain.proceed()
-
                             val fastFling = readFloatField(host, "mFastFlingVelocity")
                                 ?: return@intercept chain.proceed()
-
                             kotlin.math.abs(velocity) > fastFling
+                        }
+                    count++
+                }.onFailure {
+                    module.log(Log.WARN, TAG, "native scroll-haptic hook failed: ${it.message}")
+                }
+            }
+
+        // 2) Swipe-up dismiss START: immediate Clear All-class impulse.
+        //    This is intentionally before chain.proceed() so the motor starts with the animation.
+        val dismissStartNames = setOf(
+            "createTaskDismissAnimation",
+            "createTaskDismissAnimationAsStack"
+        )
+        cls.declaredMethods
+            .filter { it.name in dismissStartNames }
+            .forEachIndexed { index, method ->
+                method.isAccessible = true
+                runCatching {
+                    module.hook(method)
+                        .setId("launcher17312/haptic/dismissStart/${method.name}/$index")
+                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                        .intercept { chain ->
+                            if (config.hapticEffects) {
+                                val now = SystemClock.elapsedRealtime()
+                                if (now - lastDismissStartHapticAt >= 90L) {
+                                    lastDismissStartHapticAt = now
+                                    val context = (chain.thisObject as? View)?.context
+                                    if (context != null && clearAllHaptic != null) {
+                                        performClearAllHaptic(
+                                            module, context, clearAllHaptic, appFeatureUtils
+                                        )
+                                    }
+                                }
+                            }
+                            chain.proceed()
                         }
                     count++
                 }.onFailure {
                     module.log(
                         Log.WARN,
                         TAG,
-                        "native scroll-haptic gate hook failed: ${it.message}"
+                        "dismiss-start haptic hook failed ${method.name}: ${it.message}"
                     )
                 }
             }
 
-        // 2) Swipe-up task dismissal:
-        //    ColorOS sets this flag to true only after the dismiss is committed, then resets
-        //    it after the page transition. Hook that exact commit signal so a cancelled/partial
-        //    upward drag never vibrates. Reuse the EXACT clear-all button haptic:
-        //
-        //      waveId = isSupportKillProgramWave() ? 472 : 50
-        //      ya.e(context, waveId, 0L, 12)
+        // 3) Dismiss COMMIT: only a tiny terminal pulse to close the tactile envelope.
+        //    If no recent start pulse exists, fall back to Clear All feedback.
         cls.declaredMethods
             .filter {
                 it.name == "setSnapImmediatelyVibrateByTaskDismiss" &&
@@ -327,27 +370,33 @@ object LauncherStabilityHook {
                         .intercept { chain ->
                             val enabled = (chain.args.firstOrNull() as? Boolean) == true
                             val result = chain.proceed()
-
                             if (config.hapticEffects && enabled) {
-                                val host = chain.thisObject
-                                val context = (host as? View)?.context
-                                if (context != null && clearAllHaptic != null) {
-                                    runCatching {
-                                        val supportKillWave = appFeatureUtils?.let { (instance, method) ->
-                                            (method.invoke(instance) as? Boolean) == true
-                                        } ?: false
-                                        val waveId = if (supportKillWave) 472 else 50
-                                        clearAllHaptic.invoke(null, context, waveId, 0L, 12)
-                                    }.onFailure {
-                                        module.log(
-                                            Log.WARN,
-                                            TAG,
-                                            "dismiss clear-all haptic failed: ${it.message}"
+                                val context = (chain.thisObject as? View)?.context
+                                if (context != null) {
+                                    val now = SystemClock.elapsedRealtime()
+                                    val recentStart = now - lastDismissStartHapticAt in 0L..1200L
+                                    if (recentStart && softTerminalHaptic != null) {
+                                        if (now - lastDismissTerminalHapticAt >= 90L) {
+                                            lastDismissTerminalHapticAt = now
+                                            runCatching {
+                                                softTerminalHaptic.invoke(
+                                                    null, context, 68, 24L, true
+                                                )
+                                            }.onFailure {
+                                                module.log(
+                                                    Log.WARN,
+                                                    TAG,
+                                                    "dismiss terminal haptic failed: ${it.message}"
+                                                )
+                                            }
+                                        }
+                                    } else if (clearAllHaptic != null) {
+                                        performClearAllHaptic(
+                                            module, context, clearAllHaptic, appFeatureUtils
                                         )
                                     }
                                 }
                             }
-
                             result
                         }
                     count++
@@ -363,9 +412,26 @@ object LauncherStabilityHook {
         module.log(
             Log.INFO,
             TAG,
-            "native haptic hooks installed x$count; clearAllHaptic=${clearAllHaptic != null}"
+            "native haptic hooks installed x$count; clearAll=${clearAllHaptic != null}; terminal=${softTerminalHaptic != null}"
         )
         return count
+    }
+
+    private fun performClearAllHaptic(
+        module: Main,
+        context: Context,
+        clearAllHaptic: java.lang.reflect.Method,
+        appFeatureUtils: Pair<Any, java.lang.reflect.Method>?
+    ) {
+        runCatching {
+            val supportKillWave = appFeatureUtils?.let { (instance, method) ->
+                (method.invoke(instance) as? Boolean) == true
+            } ?: false
+            val waveId = if (supportKillWave) 472 else 50
+            clearAllHaptic.invoke(null, context, waveId, 0L, 12)
+        }.onFailure {
+            module.log(Log.WARN, TAG, "clear-all haptic failed: ${it.message}")
+        }
     }
     private fun readScrollerVelocity(host: Any): Float? {
         val scroller = readField(host, "mScroller") ?: return null
