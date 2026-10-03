@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.os.Handler
 import android.os.SystemClock
 import android.os.Looper
+import android.os.UserManager
 import android.util.Log
 import android.view.View
 import android.widget.TextView
@@ -13,6 +14,8 @@ import java.lang.ref.WeakReference
 import java.util.Collections
 import java.util.WeakHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Non-invasive ColorOS Launcher 17.3.12 hooks.
@@ -26,6 +29,14 @@ import java.util.concurrent.CopyOnWriteArrayList
  */
 object LauncherStabilityHook {
     private const val TAG = "${Main.TAG}/stability"
+    private const val BOOT_MIN_UPTIME_MS = 15_000L
+    private const val APP_READY_GRACE_MS = 1_500L
+    private const val PREF_RETRY_MS = 1_500L
+    private const val PREF_MAX_ATTEMPTS = 8
+
+    private val bootstrapStarted = AtomicBoolean(false)
+    private val hooksInstalled = AtomicBoolean(false)
+    private val bootstrapGeneration = AtomicInteger(0)
 
     private data class Config(
         val hapticEffects: Boolean = false,
@@ -72,7 +83,69 @@ object LauncherStabilityHook {
         "hi.ZuyqaSwipeHome1739"
     )
 
+    /**
+     * Cold-boot invariant: never perform Binder/config I/O or hook registration on
+     * PackageLoaded's critical thread. Launcher/Quickstep must reach stock-ready state first.
+     */
     fun hook(module: Main, loader: ClassLoader) {
+        if (!bootstrapStarted.compareAndSet(false, true)) return
+        val generation = bootstrapGeneration.incrementAndGet()
+
+        Thread({
+            bootSafeBootstrap(module, loader, generation)
+        }, "LauncherStabilityInit").apply {
+            isDaemon = true
+            priority = Thread.NORM_PRIORITY - 1
+            start()
+        }
+    }
+
+    private fun bootSafeBootstrap(module: Main, loader: ClassLoader, generation: Int) {
+        try {
+            // Do not touch Launcher during the first seconds of Android boot.
+            val remaining = BOOT_MIN_UPTIME_MS - SystemClock.elapsedRealtime()
+            if (remaining > 0L) SystemClock.sleep(remaining)
+
+            // Wait until the Launcher Application exists and credential-encrypted user storage
+            // is unlocked. Before this point the module remains a complete no-op.
+            var context: Context? = null
+            while (generation == bootstrapGeneration.get()) {
+                context = module.currentContext()
+                if (context != null) {
+                    val userManager = context.getSystemService(UserManager::class.java)
+                    if (userManager == null || userManager.isUserUnlocked) break
+                }
+                SystemClock.sleep(250L)
+            }
+            if (generation != bootstrapGeneration.get()) return
+
+            SystemClock.sleep(APP_READY_GRACE_MS)
+            if (generation != bootstrapGeneration.get()) return
+
+            // RemotePreferences creation performs Binder I/O. Keep every attempt off the
+            // Launcher main thread; failure leaves the process 100% stock and retries later.
+            var attached = false
+            for (attempt in 1..PREF_MAX_ATTEMPTS) {
+                if (generation != bootstrapGeneration.get()) return
+                attached = attachPrefs(module)
+                if (attached) break
+                module.log(Log.WARN, TAG, "prefs attach attempt $attempt failed; staying stock")
+                SystemClock.sleep(PREF_RETRY_MS)
+            }
+            if (!attached || generation != bootstrapGeneration.get()) {
+                module.log(Log.ERROR, TAG, "boot-safe init gave up; Launcher remains stock")
+                return
+            }
+
+            if (!hooksInstalled.compareAndSet(false, true)) return
+            installHooks(module, loader)
+        } catch (t: Throwable) {
+            // Fail open: never let module initialization take Launcher down.
+            module.log(Log.ERROR, TAG, "boot-safe init failed; Launcher remains stock", t)
+        }
+    }
+
+    private fun installHooks(module: Main, loader: ClassLoader) {
         val foundLegacy = legacyMarkers.filter { name ->
             runCatching { loader.loadClass(name) }.isSuccess
         }
@@ -85,8 +158,6 @@ object LauncherStabilityHook {
             return
         }
 
-        attachPrefs(module)
-
         var installed = 0
         installed += hookTaskHeader(module, loader)
         installed += hookClearPanel(module, loader)
@@ -96,11 +167,13 @@ object LauncherStabilityHook {
         module.log(
             if (installed > 0) Log.INFO else Log.WARN,
             TAG,
-            "installed hooks=$installed config=$config"
+            "boot-safe hooks installed=$installed config=$config"
         )
     }
-
     fun prepareHotReload() {
+        bootstrapGeneration.incrementAndGet()
+        bootstrapStarted.set(false)
+        hooksInstalled.set(false)
         val p = remotePrefs
         val l = prefsListener
         if (p != null && l != null) {
@@ -119,14 +192,14 @@ object LauncherStabilityHook {
         lastRecentsEnterHapticAt = 0L
     }
 
-    private fun attachPrefs(module: Main) {
-        if (remotePrefs != null) return
+    private fun attachPrefs(module: Main): Boolean {
+        if (remotePrefs != null) return true
         val prefs = runCatching {
             module.getRemotePreferences(LauncherStabilityPrefs.PREFS_NAME)
         }.getOrElse {
             module.log(Log.WARN, TAG, "remote prefs unavailable: ${it.message}")
             null
-        } ?: return
+        } ?: return false
 
         remotePrefs = prefs
         refreshConfig(prefs)
@@ -139,8 +212,8 @@ object LauncherStabilityHook {
         }
         prefsListener = listener
         prefs.registerOnSharedPreferenceChangeListener(listener)
+        return true
     }
-
     private fun refreshConfig(prefs: SharedPreferences) {
         config = Config(
             hapticEffects = prefs.getBoolean(
@@ -290,24 +363,6 @@ object LauncherStabilityHook {
         }.getOrNull() ?: return 0
 
         var count = 0
-        cls.declaredConstructors.forEachIndexed { index, ctor ->
-            ctor.isAccessible = true
-            runCatching {
-                module.hook(ctor)
-                    .setId("launcher17312/labels/ctor/$index")
-                    .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                    .intercept { chain ->
-                        val result = chain.proceed()
-                        chain.thisObject?.let { host ->
-                            track(bubbleLabels, host)
-                            applyBubbleLabel(host)
-                        }
-                        result
-                    }
-                count++
-            }
-        }
-
         val names = setOf(
             "updateCustomizeAppTitle",
             "resetViewProperties",
@@ -342,24 +397,6 @@ object LauncherStabilityHook {
         }.getOrNull() ?: return 0
 
         var count = 0
-        cls.declaredConstructors.forEachIndexed { index, ctor ->
-            ctor.isAccessible = true
-            runCatching {
-                module.hook(ctor)
-                    .setId("launcher17312/pageIndicator/ctor/$index")
-                    .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                    .intercept { chain ->
-                        val result = chain.proceed()
-                        chain.thisObject?.let { host ->
-                            track(pageIndicators, host)
-                            applyPageIndicator(host)
-                        }
-                        result
-                    }
-                count++
-            }
-        }
-
         val names = setOf(
             "initViewState",
             "setActivePage",
@@ -397,27 +434,8 @@ object LauncherStabilityHook {
 
         var count = 0
         classes.forEach { cls ->
-            cls.declaredConstructors.forEachIndexed { index, ctor ->
-                ctor.isAccessible = true
-                runCatching {
-                    module.hook(ctor)
-                        .setId("launcher17312/bottomSearch/${cls.simpleName}/ctor/$index")
-                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                        .intercept { chain ->
-                            val result = chain.proceed()
-                            chain.thisObject?.let { host ->
-                                track(bottomSearchViews, host)
-                                applyBottomSearch(host)
-                            }
-                            result
-                        }
-                    count++
-                }
-            }
-
             val names = setOf(
                 "onAddChildView",
-                "onMeasure",
                 "initCompactNoTitleStyle",
                 "initCompactStyle",
                 "convertToCompactNoTitle",
