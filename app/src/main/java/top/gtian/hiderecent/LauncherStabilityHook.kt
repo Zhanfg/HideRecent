@@ -30,7 +30,7 @@ object LauncherStabilityHook {
         val hapticEffects: Boolean = false,
         val dismissProfile: LauncherHapticProfile = LauncherHapticProfile.OEM_CLEAR_ALL,
         val clearAllProfile: LauncherHapticProfile = LauncherHapticProfile.OEM_CLEAR_ALL,
-        val recentsEnterProfile: LauncherHapticProfile = LauncherHapticProfile.IMPACT_SOFT,
+        val recentsEnterProfile: LauncherHapticProfile = LauncherHapticProfile.NONE,
         val hideTaskTitle: Boolean = false,
         val hideTaskIcon: Boolean = false,
         val hideClearButton: Boolean = false
@@ -145,7 +145,7 @@ object LauncherStabilityHook {
             recentsEnterProfile = LauncherHapticProfile.fromPref(
                 prefs.getString(
                     LauncherStabilityPrefs.KEY_RECENTS_ENTER_HAPTIC_PROFILE,
-                    LauncherHapticProfile.IMPACT_SOFT.prefValue
+                    LauncherHapticProfile.NONE.prefValue
                 )
             ),
             hideTaskTitle = prefs.getBoolean(
@@ -438,6 +438,7 @@ object LauncherStabilityHook {
         clearAllHaptic: java.lang.reflect.Method?,
         appFeatureUtils: Pair<Any, java.lang.reflect.Method>?
     ) {
+        if (profile == LauncherHapticProfile.NONE) return
         if (profile != LauncherHapticProfile.OEM_CLEAR_ALL) {
             profile.vibrate(context)
             return
