@@ -1,8 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">隐藏任务</string>
-    <string name="desc">自定义最近任务应用显示:勾选后该应用不出现在最近任务列表</string>
+    <string name="app_name">桌面稳定补丁</string>
+    <string name="desc">ColorOS 系统桌面 17.3.12 的非侵入式稳定补丁</string>
 
+    <string name="launcher_baseline">基线：系统桌面 17.3.12 · Android 17</string>
+    <string name="launcher_strategy">官方 Launcher APK 保持不变；功能通过 LSPosed 运行时注入。检测到旧 ZuyQA 重打包类时将自动拒绝注入。</string>
+    <string name="launcher_safe_features">Safe Features</string>
+    <string name="hide_task_title">隐藏最近任务标题</string>
+    <string name="hide_task_title_desc">仅控制 OplusTaskHeaderView 的标题视图，不修改任务动画。</string>
+    <string name="hide_task_icon">隐藏最近任务图标</string>
+    <string name="hide_task_icon_desc">仅控制任务头部图标，不改 Surface、Spring 或窗口矩阵。</string>
+    <string name="hide_clear_button">隐藏清除按钮</string>
+    <string name="hide_clear_button_desc">保留布局空间，仅隐藏清除面板显示，避免重排最近任务。</string>
+    <string name="launcher_risk_note">Window Tilt、LayerGeometry、自定义 Spring、Break/Unlock 动画本版均不注入。所有开关默认关闭。</string>
+    <string name="launcher_apply_note">修改开关后重新进入最近任务即可；若旧视图仍在缓存，重启系统桌面进程。</string>
+
+    <!-- Retained for source compatibility with the original HideRecent branch. -->
     <string name="search">搜索</string>
     <string name="orderBy">排序</string>
     <string name="order_by_name">按名称</string>
@@ -11,7 +24,6 @@
     <string name="show_system_app">显示系统应用</string>
     <string name="show_user_app">显示用户应用</string>
     <string name="loading">正在加载应用列表…</string>
-
     <string name="hide_self">隐藏自身</string>
     <string name="about">关于</string>
     <string name="open_link_failed">未找到可打开链接的应用</string>
