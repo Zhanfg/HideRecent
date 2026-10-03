@@ -28,6 +28,9 @@ object LauncherStabilityHook {
 
     private data class Config(
         val hapticEffects: Boolean = false,
+        val dismissProfile: LauncherHapticProfile = LauncherHapticProfile.OEM_CLEAR_ALL,
+        val clearAllProfile: LauncherHapticProfile = LauncherHapticProfile.OEM_CLEAR_ALL,
+        val recentsEnterProfile: LauncherHapticProfile = LauncherHapticProfile.IMPACT_SOFT,
         val hideTaskTitle: Boolean = false,
         val hideTaskIcon: Boolean = false,
         val hideClearButton: Boolean = false
@@ -37,6 +40,8 @@ object LauncherStabilityHook {
     @Volatile private var remotePrefs: SharedPreferences? = null
     @Volatile private var prefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
     @Volatile private var lastDismissStartHapticAt = 0L
+    @Volatile private var lastRecentsEnterHapticAt = 0L
+    private val bypassClearAllOverride = ThreadLocal<Boolean>()
 
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
     private val headers = CopyOnWriteArrayList<WeakReference<Any>>()
@@ -95,6 +100,7 @@ object LauncherStabilityHook {
         clearPanels.clear()
         originalVisibility.clear()
         lastDismissStartHapticAt = 0L
+        lastRecentsEnterHapticAt = 0L
     }
 
     private fun attachPrefs(module: Main) {
@@ -110,7 +116,7 @@ object LauncherStabilityHook {
         refreshConfig(prefs)
 
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { changed, key ->
-            if (key == null || LauncherStabilityPrefs.BOOLEAN_KEYS.contains(key)) {
+            if (key == null || LauncherStabilityPrefs.ALL_KEYS.contains(key)) {
                 refreshConfig(changed)
                 refreshTrackedViews()
             }
@@ -123,6 +129,24 @@ object LauncherStabilityHook {
         config = Config(
             hapticEffects = prefs.getBoolean(
                 LauncherStabilityPrefs.KEY_HAPTIC_EFFECTS, false
+            ),
+            dismissProfile = LauncherHapticProfile.fromPref(
+                prefs.getString(
+                    LauncherStabilityPrefs.KEY_DISMISS_HAPTIC_PROFILE,
+                    LauncherHapticProfile.OEM_CLEAR_ALL.prefValue
+                )
+            ),
+            clearAllProfile = LauncherHapticProfile.fromPref(
+                prefs.getString(
+                    LauncherStabilityPrefs.KEY_CLEAR_ALL_HAPTIC_PROFILE,
+                    LauncherHapticProfile.OEM_CLEAR_ALL.prefValue
+                )
+            ),
+            recentsEnterProfile = LauncherHapticProfile.fromPref(
+                prefs.getString(
+                    LauncherStabilityPrefs.KEY_RECENTS_ENTER_HAPTIC_PROFILE,
+                    LauncherHapticProfile.IMPACT_SOFT.prefValue
+                )
             ),
             hideTaskTitle = prefs.getBoolean(
                 LauncherStabilityPrefs.KEY_HIDE_TASK_TITLE, false
@@ -240,22 +264,21 @@ object LauncherStabilityHook {
             loader.loadClass("com.android.quickstep.views.OplusRecentsViewImpl")
         }.getOrNull() ?: return 0
 
-        val clearAllHaptic = runCatching {
+        val hapticClass = runCatching {
             loader.loadClass("com.android.common.util.ya")
-                .declaredMethods
-                .firstOrNull { method ->
-                    method.name == "e" &&
-                        method.parameterTypes.contentEquals(
-                            arrayOf(
-                                Context::class.java,
-                                Int::class.javaPrimitiveType,
-                                Long::class.javaPrimitiveType,
-                                Int::class.javaPrimitiveType
-                            )
-                        )
-                }
-                ?.apply { isAccessible = true }
         }.getOrNull()
+
+        val clearAllHaptic = hapticClass?.declaredMethods?.firstOrNull { method ->
+            method.name == "e" &&
+                method.parameterTypes.contentEquals(
+                    arrayOf(
+                        Context::class.java,
+                        Int::class.javaPrimitiveType,
+                        Long::class.javaPrimitiveType,
+                        Int::class.javaPrimitiveType
+                    )
+                )
+        }?.apply { isAccessible = true }
 
         val appFeatureUtils = runCatching {
             val featureCls = loader.loadClass("com.android.common.util.AppFeatureUtils")
@@ -266,7 +289,7 @@ object LauncherStabilityHook {
 
         var count = 0
 
-        // 1) Horizontal stacked-recents scrolling: preserve the proven hotfix3 gate.
+        // Horizontal stacked-recents scrolling: keep the proven ColorOS-native gate.
         cls.declaredMethods
             .filter {
                 it.name == "needVibrateWhenScroll" &&
@@ -290,12 +313,11 @@ object LauncherStabilityHook {
                         }
                     count++
                 }.onFailure {
-                    module.log(Log.WARN, TAG, "native scroll-haptic hook failed: ${it.message}")
+                    module.log(Log.WARN, TAG, "scroll-haptic hook failed: ${it.message}")
                 }
             }
 
-        // 2) Swipe-up dismiss START: immediate Clear All-class impulse.
-        //    This is intentionally before chain.proceed() so the motor starts with the animation.
+        // Single-card swipe-up dismiss: selected profile fires immediately at animation creation.
         val dismissStartNames = setOf(
             "createTaskDismissAnimation",
             "createTaskDismissAnimationAsStack"
@@ -314,9 +336,13 @@ object LauncherStabilityHook {
                                 if (now - lastDismissStartHapticAt >= 90L) {
                                     lastDismissStartHapticAt = now
                                     val context = (chain.thisObject as? View)?.context
-                                    if (context != null && clearAllHaptic != null) {
-                                        performClearAllHaptic(
-                                            module, context, clearAllHaptic, appFeatureUtils
+                                    if (context != null) {
+                                        performProfile(
+                                            module,
+                                            context,
+                                            config.dismissProfile,
+                                            clearAllHaptic,
+                                            appFeatureUtils
                                         )
                                     }
                                 }
@@ -328,33 +354,108 @@ object LauncherStabilityHook {
                     module.log(
                         Log.WARN,
                         TAG,
-                        "dismiss-start haptic hook failed ${method.name}: ${it.message}"
+                        "dismiss haptic hook failed ${method.name}: ${it.message}"
                     )
                 }
             }
 
-        module.log(
-            Log.INFO,
-            TAG,
-            "native haptic hooks installed x$count; clearAll=${clearAllHaptic != null}"
-        )
+        // Replace only the exact ColorOS Clear-All motor call when a non-OEM profile is chosen.
+        if (clearAllHaptic != null) {
+            runCatching {
+                module.hook(clearAllHaptic)
+                    .setId("launcher17312/haptic/clearAllProfile")
+                    .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                    .intercept { chain ->
+                        if (!config.hapticEffects || bypassClearAllOverride.get() == true) {
+                            return@intercept chain.proceed()
+                        }
+                        val wave = (chain.args.getOrNull(1) as? Number)?.toInt()
+                        val delay = (chain.args.getOrNull(2) as? Number)?.toLong()
+                        val strength = (chain.args.getOrNull(3) as? Number)?.toInt()
+                        val isClearAllSignature =
+                            (wave == 472 || wave == 50) && delay == 0L && strength == 12
+                        val profile = config.clearAllProfile
+                        if (!isClearAllSignature || profile == LauncherHapticProfile.OEM_CLEAR_ALL) {
+                            return@intercept chain.proceed()
+                        }
+                        val context = chain.args.firstOrNull() as? Context
+                        if (context != null) profile.vibrate(context)
+                        null
+                    }
+                count++
+            }.onFailure {
+                module.log(Log.WARN, TAG, "clear-all profile hook failed: ${it.message}")
+            }
+        }
+
+        // Entering overview/recents: one pulse on setOverviewStateEnabled(true).
+        cls.declaredMethods
+            .filter {
+                it.name == "setOverviewStateEnabled" &&
+                    it.parameterTypes.contentEquals(
+                        arrayOf(Boolean::class.javaPrimitiveType)
+                    )
+            }
+            .forEachIndexed { index, method ->
+                method.isAccessible = true
+                runCatching {
+                    module.hook(method)
+                        .setId("launcher17312/haptic/recentsEnter/$index")
+                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                        .intercept { chain ->
+                            val enabled = (chain.args.firstOrNull() as? Boolean) == true
+                            if (config.hapticEffects && enabled) {
+                                val view = chain.thisObject as? View
+                                val now = SystemClock.elapsedRealtime()
+                                if (view?.isAttachedToWindow == true &&
+                                    now - lastRecentsEnterHapticAt >= 250L) {
+                                    lastRecentsEnterHapticAt = now
+                                    performProfile(
+                                        module,
+                                        view.context,
+                                        config.recentsEnterProfile,
+                                        clearAllHaptic,
+                                        appFeatureUtils
+                                    )
+                                }
+                            }
+                            chain.proceed()
+                        }
+                    count++
+                }.onFailure {
+                    module.log(Log.WARN, TAG, "recents-enter hook failed: ${it.message}")
+                }
+            }
+
+        module.log(Log.INFO, TAG, "haptic hooks installed x$count config=$config")
         return count
     }
 
-    private fun performClearAllHaptic(
+    private fun performProfile(
         module: Main,
         context: Context,
-        clearAllHaptic: java.lang.reflect.Method,
+        profile: LauncherHapticProfile,
+        clearAllHaptic: java.lang.reflect.Method?,
         appFeatureUtils: Pair<Any, java.lang.reflect.Method>?
     ) {
+        if (profile != LauncherHapticProfile.OEM_CLEAR_ALL) {
+            profile.vibrate(context)
+            return
+        }
+        if (clearAllHaptic == null) return
         runCatching {
             val supportKillWave = appFeatureUtils?.let { (instance, method) ->
                 (method.invoke(instance) as? Boolean) == true
             } ?: false
             val waveId = if (supportKillWave) 472 else 50
-            clearAllHaptic.invoke(null, context, waveId, 0L, 12)
+            bypassClearAllOverride.set(true)
+            try {
+                clearAllHaptic.invoke(null, context, waveId, 0L, 12)
+            } finally {
+                bypassClearAllOverride.remove()
+            }
         }.onFailure {
-            module.log(Log.WARN, TAG, "clear-all haptic failed: ${it.message}")
+            module.log(Log.WARN, TAG, "OEM haptic failed: ${it.message}")
         }
     }
     private fun readScrollerVelocity(host: Any): Float? {
