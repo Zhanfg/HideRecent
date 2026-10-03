@@ -32,11 +32,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "top.gtian.hiderecent"
+        applicationId = "cc.axymorrsen.launcherstability"
         minSdk = 29
-        targetSdk = 34
-        versionCode = 2026100103
-        versionName = "v26.10.1-generic1-hotfix2"
+        targetSdk = 37
+        versionCode = 173120001
+        versionName = "17.3.12-stability-hotfix1"
     }
 
     buildTypes {
