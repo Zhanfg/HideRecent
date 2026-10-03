@@ -1,5 +1,6 @@
 package top.gtian.hiderecent
 
+import android.content.Context
 import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
@@ -236,54 +237,123 @@ object LauncherStabilityHook {
             loader.loadClass("com.android.quickstep.views.OplusRecentsViewImpl")
         }.getOrNull() ?: return 0
 
-        val methods = cls.declaredMethods.filter {
-            it.name == "needVibrateWhenScroll" &&
-                it.parameterTypes.isEmpty() &&
-                it.returnType == Boolean::class.javaPrimitiveType
-        }
-        if (methods.isEmpty()) return 0
+        val oemHaptic = runCatching {
+            loader.loadClass("com.android.common.util.ya")
+                .declaredMethods
+                .firstOrNull { method ->
+                    method.name == "c" &&
+                        method.parameterTypes.contentEquals(
+                            arrayOf(
+                                Context::class.java,
+                                Int::class.javaPrimitiveType,
+                                Long::class.javaPrimitiveType,
+                                Boolean::class.javaPrimitiveType
+                            )
+                        )
+                }
+                ?.apply { isAccessible = true }
+        }.getOrNull()
 
         var count = 0
-        methods.forEachIndexed { index, method ->
-            method.isAccessible = true
-            runCatching {
-                module.hook(method)
-                    .setId("launcher17312/haptic/nativeScrollGate/$index")
-                    .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                    .intercept { chain ->
-                        if (!config.hapticEffects) {
-                            return@intercept chain.proceed()
-                        }
 
-                        val host = chain.thisObject
-                            ?: return@intercept chain.proceed()
-
-                        val velocity = readScrollerVelocity(host)
-                            ?: return@intercept chain.proceed()
-
-                        val fastFling = readFloatField(host, "mFastFlingVelocity")
-                            ?: return@intercept chain.proceed()
-
-                        kotlin.math.abs(velocity) > fastFling
-                    }
-                count++
-            }.onFailure {
-                module.log(
-                    Log.WARN,
-                    TAG,
-                    "native scroll-haptic gate hook failed: ${it.message}"
-                )
+        // 1) Horizontal stacked-recents scrolling:
+        //    exact runtime equivalent of replacing needVibrateWhenScroll() with
+        //    abs(mScroller.getCurrVelocity()) > mFastFlingVelocity.
+        cls.declaredMethods
+            .filter {
+                it.name == "needVibrateWhenScroll" &&
+                    it.parameterTypes.isEmpty() &&
+                    it.returnType == Boolean::class.javaPrimitiveType
             }
-        }
+            .forEachIndexed { index, method ->
+                method.isAccessible = true
+                runCatching {
+                    module.hook(method)
+                        .setId("launcher17312/haptic/nativeScrollGate/$index")
+                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                        .intercept { chain ->
+                            if (!config.hapticEffects) {
+                                return@intercept chain.proceed()
+                            }
+
+                            val host = chain.thisObject
+                                ?: return@intercept chain.proceed()
+
+                            val velocity = readScrollerVelocity(host)
+                                ?: return@intercept chain.proceed()
+
+                            val fastFling = readFloatField(host, "mFastFlingVelocity")
+                                ?: return@intercept chain.proceed()
+
+                            kotlin.math.abs(velocity) > fastFling
+                        }
+                    count++
+                }.onFailure {
+                    module.log(
+                        Log.WARN,
+                        TAG,
+                        "native scroll-haptic gate hook failed: ${it.message}"
+                    )
+                }
+            }
+
+        // 2) Swipe-up task dismissal:
+        //    ColorOS sets this flag to true only after the dismiss is committed, then resets
+        //    it after the page transition. Hook that exact commit signal so a cancelled/partial
+        //    upward drag never vibrates. Reuse the same OEM motor effect used by
+        //    computeScrollHelper(): ya.c(context, 68, 65L, true).
+        cls.declaredMethods
+            .filter {
+                it.name == "setSnapImmediatelyVibrateByTaskDismiss" &&
+                    it.parameterTypes.contentEquals(
+                        arrayOf(Boolean::class.javaPrimitiveType)
+                    )
+            }
+            .forEachIndexed { index, method ->
+                method.isAccessible = true
+                runCatching {
+                    module.hook(method)
+                        .setId("launcher17312/haptic/dismissCommit/$index")
+                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                        .intercept { chain ->
+                            val enabled = (chain.args.firstOrNull() as? Boolean) == true
+                            val result = chain.proceed()
+
+                            if (config.hapticEffects && enabled) {
+                                val host = chain.thisObject
+                                val context = (host as? View)?.context
+                                if (context != null && oemHaptic != null) {
+                                    runCatching {
+                                        oemHaptic.invoke(null, context, 68, 65L, true)
+                                    }.onFailure {
+                                        module.log(
+                                            Log.WARN,
+                                            TAG,
+                                            "dismiss OEM haptic failed: ${it.message}"
+                                        )
+                                    }
+                                }
+                            }
+
+                            result
+                        }
+                    count++
+                }.onFailure {
+                    module.log(
+                        Log.WARN,
+                        TAG,
+                        "dismiss-commit haptic hook failed: ${it.message}"
+                    )
+                }
+            }
 
         module.log(
             Log.INFO,
             TAG,
-            "native scroll-haptic gate installed x$count"
+            "native haptic hooks installed x$count; oemHelper=${oemHaptic != null}"
         )
         return count
     }
-
     private fun readScrollerVelocity(host: Any): Float? {
         val scroller = readField(host, "mScroller") ?: return null
         val method = scroller.javaClass.methods.firstOrNull {
