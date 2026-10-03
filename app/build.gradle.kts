@@ -35,8 +35,8 @@ android {
         applicationId = "cc.axymorrsen.launcherstability"
         minSdk = 29
         targetSdk = 37
-        versionCode = 173120001
-        versionName = "17.3.12-stability-hotfix1"
+        versionCode = 173120002
+        versionName = "17.3.12-stability-hotfix2"
     }
 
     buildTypes {
