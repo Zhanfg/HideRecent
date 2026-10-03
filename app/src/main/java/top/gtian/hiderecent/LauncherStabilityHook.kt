@@ -137,8 +137,29 @@ object LauncherStabilityHook {
                 return
             }
 
-            if (!hooksInstalled.compareAndSet(false, true)) return
-            installHooks(module, loader)
+            // Hook registration itself is deferred until the Launcher main queue is idle.
+            // This avoids racing class loading / first layout even after preferences are ready.
+            mainHandler.post {
+                if (generation != bootstrapGeneration.get()) return@post
+                Looper.myQueue().addIdleHandler {
+                    if (generation == bootstrapGeneration.get() &&
+                        hooksInstalled.compareAndSet(false, true)
+                    ) {
+                        runCatching {
+                            installHooks(module, loader)
+                        }.onFailure {
+                            hooksInstalled.set(false)
+                            module.log(
+                                Log.ERROR,
+                                TAG,
+                                "idle hook install failed; Launcher remains stock",
+                                it
+                            )
+                        }
+                    }
+                    false
+                }
+            }
         } catch (t: Throwable) {
             // Fail open: never let module initialization take Launcher down.
             module.log(Log.ERROR, TAG, "boot-safe init failed; Launcher remains stock", t)
@@ -181,6 +202,7 @@ object LauncherStabilityHook {
         }
         remotePrefs = null
         prefsListener = null
+        config = Config()
         headers.clear()
         clearPanels.clear()
         bubbleLabels.clear()
