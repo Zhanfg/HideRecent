@@ -7,6 +7,7 @@ import android.os.SystemClock
 import android.os.Looper
 import android.util.Log
 import android.view.View
+import android.widget.TextView
 import io.github.libxposed.api.XposedInterface
 import java.lang.ref.WeakReference
 import java.util.Collections
@@ -31,6 +32,10 @@ object LauncherStabilityHook {
         val dismissProfile: LauncherHapticProfile = LauncherHapticProfile.OEM_CLEAR_ALL,
         val clearAllProfile: LauncherHapticProfile = LauncherHapticProfile.OEM_CLEAR_ALL,
         val recentsEnterProfile: LauncherHapticProfile = LauncherHapticProfile.NONE,
+        val hideWorkspaceLabels: Boolean = false,
+        val hideDrawerLabels: Boolean = false,
+        val hidePageIndicator: Boolean = false,
+        val hideBottomSearch: Boolean = false,
         val hideTaskTitle: Boolean = false,
         val hideTaskIcon: Boolean = false,
         val hideClearButton: Boolean = false
@@ -46,9 +51,15 @@ object LauncherStabilityHook {
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
     private val headers = CopyOnWriteArrayList<WeakReference<Any>>()
     private val clearPanels = CopyOnWriteArrayList<WeakReference<Any>>()
+    private val bubbleLabels = CopyOnWriteArrayList<WeakReference<Any>>()
+    private val pageIndicators = CopyOnWriteArrayList<WeakReference<Any>>()
+    private val bottomSearchViews = CopyOnWriteArrayList<WeakReference<Any>>()
 
     private val originalVisibility = Collections.synchronizedMap(
         WeakHashMap<View, Int>()
+    )
+    private val originalTextPaintAlpha = Collections.synchronizedMap(
+        WeakHashMap<TextView, Int>()
     )
 
     private val legacyMarkers = arrayOf(
@@ -79,6 +90,7 @@ object LauncherStabilityHook {
         var installed = 0
         installed += hookTaskHeader(module, loader)
         installed += hookClearPanel(module, loader)
+        installed += hookDesktopPresentation(module, loader)
         installed += hookHaptics(module, loader)
 
         module.log(
@@ -98,7 +110,11 @@ object LauncherStabilityHook {
         prefsListener = null
         headers.clear()
         clearPanels.clear()
+        bubbleLabels.clear()
+        pageIndicators.clear()
+        bottomSearchViews.clear()
         originalVisibility.clear()
+        originalTextPaintAlpha.clear()
         lastDismissStartHapticAt = 0L
         lastRecentsEnterHapticAt = 0L
     }
@@ -147,6 +163,18 @@ object LauncherStabilityHook {
                     LauncherStabilityPrefs.KEY_RECENTS_ENTER_HAPTIC_PROFILE,
                     LauncherHapticProfile.NONE.prefValue
                 )
+            ),
+            hideWorkspaceLabels = prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_HIDE_WORKSPACE_LABELS, false
+            ),
+            hideDrawerLabels = prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_HIDE_DRAWER_LABELS, false
+            ),
+            hidePageIndicator = prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_HIDE_PAGE_INDICATOR, false
+            ),
+            hideBottomSearch = prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_HIDE_BOTTOM_SEARCH, false
             ),
             hideTaskTitle = prefs.getBoolean(
                 LauncherStabilityPrefs.KEY_HIDE_TASK_TITLE, false
@@ -248,6 +276,181 @@ object LauncherStabilityHook {
         return count
     }
 
+    private fun hookDesktopPresentation(module: Main, loader: ClassLoader): Int {
+        var count = 0
+        count += hookBubbleLabels(module, loader)
+        count += hookPageIndicator(module, loader)
+        count += hookBottomSearch(module, loader)
+        return count
+    }
+
+    private fun hookBubbleLabels(module: Main, loader: ClassLoader): Int {
+        val cls = runCatching {
+            loader.loadClass("com.android.launcher3.OplusBubbleTextView")
+        }.getOrNull() ?: return 0
+
+        var count = 0
+        cls.declaredConstructors.forEachIndexed { index, ctor ->
+            ctor.isAccessible = true
+            runCatching {
+                module.hook(ctor)
+                    .setId("launcher17312/labels/ctor/$index")
+                    .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                    .intercept { chain ->
+                        val result = chain.proceed()
+                        chain.thisObject?.let { host ->
+                            track(bubbleLabels, host)
+                            applyBubbleLabel(host)
+                        }
+                        result
+                    }
+                count++
+            }
+        }
+
+        val names = setOf(
+            "updateCustomizeAppTitle",
+            "resetViewProperties",
+            "updateTextSize",
+            "updateViewsForScale"
+        )
+        cls.declaredMethods
+            .filter { it.name in names }
+            .forEachIndexed { index, method ->
+                method.isAccessible = true
+                runCatching {
+                    module.hook(method)
+                        .setId("launcher17312/labels/${method.name}/$index")
+                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                        .intercept { chain ->
+                            val result = chain.proceed()
+                            chain.thisObject?.let { host ->
+                                track(bubbleLabels, host)
+                                applyBubbleLabel(host)
+                            }
+                            result
+                        }
+                    count++
+                }
+            }
+        return count
+    }
+
+    private fun hookPageIndicator(module: Main, loader: ClassLoader): Int {
+        val cls = runCatching {
+            loader.loadClass("com.android.launcher.pageindicators.OplusPageIndicator")
+        }.getOrNull() ?: return 0
+
+        var count = 0
+        cls.declaredConstructors.forEachIndexed { index, ctor ->
+            ctor.isAccessible = true
+            runCatching {
+                module.hook(ctor)
+                    .setId("launcher17312/pageIndicator/ctor/$index")
+                    .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                    .intercept { chain ->
+                        val result = chain.proceed()
+                        chain.thisObject?.let { host ->
+                            track(pageIndicators, host)
+                            applyPageIndicator(host)
+                        }
+                        result
+                    }
+                count++
+            }
+        }
+
+        val names = setOf(
+            "initViewState",
+            "setActivePage",
+            "updateActiveIndex",
+            "updatePressEffectForState",
+            "updateBackgroundRect"
+        )
+        cls.declaredMethods
+            .filter { it.name in names }
+            .forEachIndexed { index, method ->
+                method.isAccessible = true
+                runCatching {
+                    module.hook(method)
+                        .setId("launcher17312/pageIndicator/${method.name}/$index")
+                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                        .intercept { chain ->
+                            val result = chain.proceed()
+                            chain.thisObject?.let { host ->
+                                track(pageIndicators, host)
+                                applyPageIndicator(host)
+                            }
+                            result
+                        }
+                    count++
+                }
+            }
+        return count
+    }
+
+    private fun hookBottomSearch(module: Main, loader: ClassLoader): Int {
+        val classes = listOf(
+            "com.android.launcher.bottomsearch.BottomSearchBoxContainerView",
+            "com.android.launcher3.qsb.QsbWidgetHostView"
+        ).mapNotNull { runCatching { loader.loadClass(it) }.getOrNull() }
+
+        var count = 0
+        classes.forEach { cls ->
+            cls.declaredConstructors.forEachIndexed { index, ctor ->
+                ctor.isAccessible = true
+                runCatching {
+                    module.hook(ctor)
+                        .setId("launcher17312/bottomSearch/${cls.simpleName}/ctor/$index")
+                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                        .intercept { chain ->
+                            val result = chain.proceed()
+                            chain.thisObject?.let { host ->
+                                track(bottomSearchViews, host)
+                                applyBottomSearch(host)
+                            }
+                            result
+                        }
+                    count++
+                }
+            }
+
+            val names = setOf(
+                "onAddChildView",
+                "onMeasure",
+                "initCompactNoTitleStyle",
+                "initCompactStyle",
+                "convertToCompactNoTitle",
+                "convertToCompactStyle",
+                "convertToSpreadStyle",
+                "getDefaultView"
+            )
+            cls.declaredMethods
+                .filter { it.name in names }
+                .forEachIndexed { index, method ->
+                    method.isAccessible = true
+                    runCatching {
+                        module.hook(method)
+                            .setId("launcher17312/bottomSearch/${cls.simpleName}/${method.name}/$index")
+                            .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                            .intercept { chain ->
+                                val result = chain.proceed()
+                                chain.thisObject?.let { host ->
+                                    track(bottomSearchViews, host)
+                                    applyBottomSearch(host)
+                                }
+                                if (result is View) {
+                                    track(bottomSearchViews, result)
+                                    applyBottomSearch(result)
+                                }
+                                result
+                            }
+                        count++
+                    }
+                }
+        }
+        return count
+    }
     /**
      * Exact runtime equivalent of the ColorOS 16/17 Smali scroll-haptic patch.
      *
@@ -494,6 +697,42 @@ object LauncherStabilityHook {
         }
         return null
     }
+    private fun applyBubbleLabel(host: Any) {
+        val textView = host as? TextView ?: return
+        val inDrawer = (invokeNoArgDeep(host, "isInDrawer") as? Boolean) == true
+        val hide = if (inDrawer) config.hideDrawerLabels else config.hideWorkspaceLabels
+        setTextHiddenPreservingPaint(textView, hide)
+    }
+
+    private fun applyPageIndicator(host: Any) {
+        val view = host as? View ?: return
+        setHiddenPreservingState(view, config.hidePageIndicator)
+    }
+
+    private fun applyBottomSearch(host: Any) {
+        val view = host as? View ?: return
+        setHiddenPreservingState(view, config.hideBottomSearch)
+    }
+
+    private fun setTextHiddenPreservingPaint(view: TextView, hide: Boolean) {
+        synchronized(originalTextPaintAlpha) {
+            if (hide) {
+                if (!originalTextPaintAlpha.containsKey(view)) {
+                    originalTextPaintAlpha[view] = view.paint.alpha
+                }
+                if (view.paint.alpha != 0) {
+                    view.paint.alpha = 0
+                    view.invalidate()
+                }
+            } else {
+                val original = originalTextPaintAlpha.remove(view)
+                if (original != null && view.paint.alpha != original) {
+                    view.paint.alpha = original
+                    view.invalidate()
+                }
+            }
+        }
+    }
     private fun applyHeader(host: Any) {
         val current = config
 
@@ -534,6 +773,23 @@ object LauncherStabilityHook {
         method.invoke(host)
     }.getOrNull()
 
+    private fun invokeNoArgDeep(host: Any, name: String): Any? {
+        var cls: Class<*>? = host.javaClass
+        while (cls != null) {
+            val method = cls.declaredMethods.firstOrNull {
+                it.name == name && it.parameterTypes.isEmpty()
+            }
+            if (method != null) {
+                return runCatching {
+                    method.isAccessible = true
+                    method.invoke(host)
+                }.getOrNull()
+            }
+            cls = cls.superclass
+        }
+        return null
+    }
+
     private fun track(list: CopyOnWriteArrayList<WeakReference<Any>>, host: Any) {
         var exists = false
         list.removeAll { ref ->
@@ -551,6 +807,9 @@ object LauncherStabilityHook {
         val action = Runnable {
             refreshList(headers) { applyHeader(it) }
             refreshList(clearPanels) { applyClearPanel(it) }
+            refreshList(bubbleLabels) { applyBubbleLabel(it) }
+            refreshList(pageIndicators) { applyPageIndicator(it) }
+            refreshList(bottomSearchViews) { applyBottomSearch(it) }
         }
         if (Looper.myLooper() == Looper.getMainLooper()) {
             action.run()
