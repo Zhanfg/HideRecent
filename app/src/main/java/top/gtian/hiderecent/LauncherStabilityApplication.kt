@@ -20,7 +20,7 @@ internal object LauncherRemotePrefsSync {
     @Volatile private var localPrefs: SharedPreferences? = null
 
     private val localListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == null || key in LauncherStabilityPrefs.BOOLEAN_KEYS) pushNow()
+        if (key == null || key in LauncherStabilityPrefs.ALL_KEYS) pushNow()
     }
 
     fun start(app: Application) {
@@ -58,6 +58,9 @@ internal object LauncherRemotePrefsSync {
 
             LauncherStabilityPrefs.BOOLEAN_KEYS.forEach { key ->
                 editor.putBoolean(key, prefs.getBoolean(key, false))
+            }
+            LauncherStabilityPrefs.STRING_KEYS.forEach { key ->
+                editor.putString(key, prefs.getString(key, null))
             }
             editor.apply()
         }.onFailure {
