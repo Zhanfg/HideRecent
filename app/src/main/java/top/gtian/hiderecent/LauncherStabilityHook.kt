@@ -3,9 +3,7 @@ package top.gtian.hiderecent
 import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.util.Log
-import android.view.HapticFeedbackConstants
 import android.view.View
 import io.github.libxposed.api.XposedInterface
 import java.lang.ref.WeakReference
@@ -26,10 +24,6 @@ import java.util.concurrent.CopyOnWriteArrayList
 object LauncherStabilityHook {
     private const val TAG = "${Main.TAG}/stability"
 
-    private const val PAGE_HAPTIC_GAP_MS = 65L
-    private const val ACTION_HAPTIC_GAP_MS = 120L
-    private const val STRONG_HAPTIC_GAP_MS = 220L
-
     private data class Config(
         val hapticEffects: Boolean = false,
         val hideTaskTitle: Boolean = false,
@@ -40,11 +34,6 @@ object LauncherStabilityHook {
     @Volatile private var config = Config()
     @Volatile private var remotePrefs: SharedPreferences? = null
     @Volatile private var prefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
-
-    @Volatile private var lastPage = Int.MIN_VALUE
-    @Volatile private var lastPageHapticAt = 0L
-    @Volatile private var lastActionHapticAt = 0L
-    @Volatile private var lastStrongHapticAt = 0L
 
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
     private val headers = CopyOnWriteArrayList<WeakReference<Any>>()
@@ -102,10 +91,6 @@ object LauncherStabilityHook {
         headers.clear()
         clearPanels.clear()
         originalVisibility.clear()
-        lastPage = Int.MIN_VALUE
-        lastPageHapticAt = 0L
-        lastActionHapticAt = 0L
-        lastStrongHapticAt = 0L
     }
 
     private fun attachPrefs(module: Main) {
@@ -236,219 +221,104 @@ object LauncherStabilityHook {
     }
 
     /**
-     * Haptic layer.
+     * Exact runtime equivalent of the ColorOS 16/17 Smali scroll-haptic patch.
      *
-     * The clean 17.3.12 launcher already exposes the OEM haptic path through
-     * OplusRecentsViewImpl/View.performHapticFeedback(). We only add calls at semantic event
-     * boundaries. No vibrator service, waveform, animation frame callback, or Surface hook is used.
+     * Upstream computeScrollHelper() calls needVibrateWhenScroll() before its OEM haptic branch.
+     * The community patch replaces that boolean gate with:
+     *
+     *   abs(mScroller.getCurrVelocity()) > mFastFlingVelocity
+     *
+     * Hooking needVibrateWhenScroll() to return the same predicate preserves the rest of
+     * computeScrollHelper(), including OPlus' own motor effect, debounce and global settings.
      */
     private fun hookHaptics(module: Main, loader: ClassLoader): Int {
         val cls = runCatching {
             loader.loadClass("com.android.quickstep.views.OplusRecentsViewImpl")
         }.getOrNull() ?: return 0
 
+        val methods = cls.declaredMethods.filter {
+            it.name == "needVibrateWhenScroll" &&
+                it.parameterTypes.isEmpty() &&
+                it.returnType == Boolean::class.javaPrimitiveType
+        }
+        if (methods.isEmpty()) return 0
+
         var count = 0
-
-        // A light detent when the centered task page actually changes.
-        cls.declaredMethods
-            .filter { method ->
-                method.name == "notifyPageSwitchListener" &&
-                    method.parameterTypes.size == 1 &&
-                    method.parameterTypes[0] == Int::class.javaPrimitiveType
-            }
-            .forEachIndexed { index, method ->
-                method.isAccessible = true
-                runCatching {
-                    module.hook(method)
-                        .setId("launcher17312/haptic/page/$index")
-                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                        .intercept { chain ->
-                            val result = chain.proceed()
-                            if (config.hapticEffects) {
-                                val page = (chain.args.getOrNull(0) as? Number)?.toInt()
-                                if (page != null && page != lastPage) {
-                                    lastPage = page
-                                    firePageHaptic(chain.thisObject, chain.args)
-                                }
-                            }
-                            result
+        methods.forEachIndexed { index, method ->
+            method.isAccessible = true
+            runCatching {
+                module.hook(method)
+                    .setId("launcher17312/haptic/nativeScrollGate/$index")
+                    .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                    .intercept { chain ->
+                        if (!config.hapticEffects) {
+                            return@intercept chain.proceed()
                         }
-                    count++
-                }.onFailure {
-                    module.log(Log.WARN, TAG, "page haptic hook failed: ${it.message}")
-                }
-            }
 
-        // Swipe-to-dismiss: trigger once when the dismissal animation is created.
-        val dismissNames = setOf(
-            "createTaskDismissAnimation",
-            "createTaskDismissAnimationAsStack"
+                        val host = chain.thisObject
+                            ?: return@intercept chain.proceed()
+
+                        val velocity = readScrollerVelocity(host)
+                            ?: return@intercept chain.proceed()
+
+                        val fastFling = readFloatField(host, "mFastFlingVelocity")
+                            ?: return@intercept chain.proceed()
+
+                        kotlin.math.abs(velocity) > fastFling
+                    }
+                count++
+            }.onFailure {
+                module.log(
+                    Log.WARN,
+                    TAG,
+                    "native scroll-haptic gate hook failed: ${it.message}"
+                )
+            }
+        }
+
+        module.log(
+            Log.INFO,
+            TAG,
+            "native scroll-haptic gate installed x$count"
         )
-        cls.declaredMethods
-            .filter { it.name in dismissNames }
-            .forEachIndexed { index, method ->
-                method.isAccessible = true
-                runCatching {
-                    module.hook(method)
-                        .setId("launcher17312/haptic/dismiss/${method.name}/$index")
-                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                        .intercept { chain ->
-                            val result = chain.proceed()
-                            if (config.hapticEffects) {
-                                fireActionHaptic(
-                                    chain.thisObject,
-                                    chain.args,
-                                    HapticFeedbackConstants.CONFIRM
-                                )
-                            }
-                            result
-                        }
-                    count++
-                }.onFailure {
-                    module.log(Log.WARN, TAG, "dismiss haptic hook failed: ${it.message}")
-                }
-            }
-
-        // Clear-all is intentionally stronger and separately rate-limited.
-        cls.declaredMethods
-            .filter { it.name == "dismissAllTasks" }
-            .forEachIndexed { index, method ->
-                method.isAccessible = true
-                runCatching {
-                    module.hook(method)
-                        .setId("launcher17312/haptic/clearAll/$index")
-                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                        .intercept { chain ->
-                            if (config.hapticEffects) {
-                                fireStrongHaptic(
-                                    chain.thisObject,
-                                    chain.args,
-                                    HapticFeedbackConstants.CONFIRM
-                                )
-                            }
-                            chain.proceed()
-                        }
-                    count++
-                }.onFailure {
-                    module.log(Log.WARN, TAG, "clear-all haptic hook failed: ${it.message}")
-                }
-            }
-
-        // Opening a task from overview: a short confirmation at the action boundary.
-        cls.declaredMethods
-            .filter { it.name == "launchTasksAnimatedCompat" }
-            .forEachIndexed { index, method ->
-                method.isAccessible = true
-                runCatching {
-                    module.hook(method)
-                        .setId("launcher17312/haptic/launch/$index")
-                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                        .intercept { chain ->
-                            if (config.hapticEffects) {
-                                fireActionHaptic(
-                                    chain.thisObject,
-                                    chain.args,
-                                    HapticFeedbackConstants.GESTURE_END
-                                )
-                            }
-                            chain.proceed()
-                        }
-                    count++
-                }.onFailure {
-                    module.log(Log.WARN, TAG, "launch haptic hook failed: ${it.message}")
-                }
-            }
-
-        // Horizontal interaction start and returning home get paired gesture boundary feedback.
-        cls.declaredMethods
-            .filter {
-                (it.name == "onScrollInteractionBegin" || it.name == "startHomeFromRecents") &&
-                    it.parameterTypes.isEmpty()
-            }
-            .forEachIndexed { index, method ->
-                method.isAccessible = true
-                runCatching {
-                    module.hook(method)
-                        .setId("launcher17312/haptic/gesture/${method.name}/$index")
-                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                        .intercept { chain ->
-                            if (config.hapticEffects) {
-                                val type = if (method.name == "onScrollInteractionBegin") {
-                                    HapticFeedbackConstants.GESTURE_START
-                                } else {
-                                    HapticFeedbackConstants.GESTURE_END
-                                }
-                                fireActionHaptic(chain.thisObject, chain.args, type)
-                            }
-                            chain.proceed()
-                        }
-                    count++
-                }.onFailure {
-                    module.log(Log.WARN, TAG, "gesture haptic hook failed: ${it.message}")
-                }
-            }
-
         return count
     }
 
-    private fun firePageHaptic(host: Any?, args: List<Any?>) {
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastPageHapticAt < PAGE_HAPTIC_GAP_MS) return
-        lastPageHapticAt = now
-        performHaptic(host, args, HapticFeedbackConstants.SEGMENT_TICK)
-    }
+    private fun readScrollerVelocity(host: Any): Float? {
+        val scroller = readField(host, "mScroller") ?: return null
+        val method = scroller.javaClass.methods.firstOrNull {
+            it.name == "getCurrVelocity" &&
+                it.parameterTypes.isEmpty()
+        } ?: scroller.javaClass.declaredMethods.firstOrNull {
+            it.name == "getCurrVelocity" &&
+                it.parameterTypes.isEmpty()
+        } ?: return null
 
-    private fun fireActionHaptic(host: Any?, args: List<Any?>, type: Int) {
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastActionHapticAt < ACTION_HAPTIC_GAP_MS) return
-        lastActionHapticAt = now
-        performHaptic(host, args, type)
-    }
-
-    private fun fireStrongHaptic(host: Any?, args: List<Any?>, type: Int) {
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastStrongHapticAt < STRONG_HAPTIC_GAP_MS) return
-        lastStrongHapticAt = now
-
-        val view = findHapticView(host, args) ?: return
-        // Two confirmation impulses with a short spacing feel more deliberate than a long buzz,
-        // while still using the OEM haptic pipeline and system vibration policy.
-        performHapticOnView(view, type)
-        mainHandler.postDelayed(
-            { if (config.hapticEffects && view.isAttachedToWindow) performHapticOnView(view, type) },
-            55L
-        )
-    }
-
-    private fun performHaptic(host: Any?, args: List<Any?>, type: Int): Boolean {
-        val view = findHapticView(host, args) ?: return false
-        return performHapticOnView(view, type)
-    }
-
-    private fun performHapticOnView(view: View, type: Int): Boolean {
         return runCatching {
-            // First use the exact launcher/View policy. If the host disabled only its local
-            // haptic flag, ignore that local flag on the second try but still keep global policy.
-            view.performHapticFeedback(type) ||
-                view.performHapticFeedback(
-                    type,
-                    HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
-                )
-        }.getOrDefault(false)
+            method.isAccessible = true
+            (method.invoke(scroller) as? Number)?.toFloat()
+        }.getOrNull()
     }
 
-    private fun findHapticView(host: Any?, args: List<Any?>): View? {
-        if (host is View) return host
+    private fun readFloatField(host: Any, name: String): Float? {
+        val value = readField(host, name) ?: return null
+        return (value as? Number)?.toFloat()
+    }
 
-        args.firstOrNull { it is View }?.let { return it as View }
-
-        if (host != null) {
-            (invokeNoArg(host, "getCurrentPageOrExtra") as? View)?.let { return it }
-            (invokeNoArg(host, "getFocusedTaskView") as? View)?.let { return it }
+    private fun readField(host: Any, name: String): Any? {
+        var cls: Class<*>? = host.javaClass
+        while (cls != null) {
+            val field = cls.declaredFields.firstOrNull { it.name == name }
+            if (field != null) {
+                return runCatching {
+                    field.isAccessible = true
+                    field.get(host)
+                }.getOrNull()
+            }
+            cls = cls.superclass
         }
         return null
     }
-
     private fun applyHeader(host: Any) {
         val current = config
 
