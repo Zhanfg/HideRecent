@@ -1,13 +1,5 @@
-# Generic system_server layer (primary cross-ROM filtering)
-android
-system
-
-# AOSP / Launcher3 / Pixel Quickstep hosts
+# ColorOS / OPlus launcher hosts only.
+# No system_server or SystemUI injection: keep the patch out of unrelated processes.
 com.android.launcher
-com.android.launcher3
-com.google.android.apps.nexuslauncher
-com.android.systemui
-
-# ColorOS / OPlus vendor enhancement layer
 com.oplus.quickstep
 com.oplus.launcher
