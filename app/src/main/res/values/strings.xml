@@ -19,13 +19,23 @@
     <string name="haptic_lab_desc">逐个试听 Telegram 风格的触觉波形。Impact 适合动作边界，Selection 适合连续选择变化，Notification 适合完成、警告和错误反馈。</string>
     <string name="haptic_preview_failed">当前设备无法播放这个触觉 profile</string>
 
+    <string name="desktop_display_title">桌面显示</string>
+    <string name="hide_workspace_labels">隐藏桌面图标名称</string>
+    <string name="hide_workspace_labels_desc">只隐藏桌面图标文字绘制，图标、点击区域和布局保持原样；关闭后即时恢复。</string>
+    <string name="hide_drawer_labels">隐藏抽屉图标名称</string>
+    <string name="hide_drawer_labels_desc">只作用于应用抽屉中的 OplusBubbleTextView，不影响桌面图标名称。</string>
+    <string name="hide_page_indicator">隐藏桌面页指示器</string>
+    <string name="hide_page_indicator_desc">隐藏 OplusPageIndicator 的显示，但保留原布局位置和页面切换逻辑。</string>
+    <string name="hide_bottom_search">隐藏底部搜索框 / QSB</string>
+    <string name="hide_bottom_search_desc">隐藏 BottomSearchBoxContainerView 与 QsbWidgetHostView 的显示，不修改桌面数据库或 DeviceProfile。</string>
+
     <string name="hide_task_title">隐藏最近任务标题</string>
     <string name="hide_task_title_desc">仅控制 OplusTaskHeaderView 的标题视图，不修改任务动画。</string>
     <string name="hide_task_icon">隐藏最近任务图标</string>
     <string name="hide_task_icon_desc">仅控制任务头部图标，不改 Surface、Spring 或窗口矩阵。</string>
     <string name="hide_clear_button">隐藏清除按钮</string>
     <string name="hide_clear_button_desc">保留布局空间，仅隐藏清除面板显示，避免重排最近任务。</string>
-    <string name="launcher_risk_note">Window Tilt、LayerGeometry、自定义 Spring、Break/Unlock 动画仍不注入。触觉系统已经拆分为横向滑动原生链和可配置动作 profile，避免所有动作共用一种震感。</string>
+    <string name="launcher_risk_note">本版新增的桌面显示功能全部限制在 View 层：不改数据库、DeviceProfile、SurfaceControl 或 Spring。Window Tilt、LayerGeometry、Break/Unlock 等高风险动画仍继续隔离。</string>
     <string name="launcher_apply_note">触觉 profile 保存后立即同步到 Launcher；若桌面进程仍缓存旧模块代码，重启系统桌面进程。</string>
 
     <string name="search">搜索</string>
