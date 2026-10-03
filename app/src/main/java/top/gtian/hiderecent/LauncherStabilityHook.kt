@@ -380,7 +380,7 @@ object LauncherStabilityHook {
                                             lastDismissTerminalHapticAt = now
                                             runCatching {
                                                 softTerminalHaptic.invoke(
-                                                    null, context, 68, 24L, true
+                                                    null, context, 68, 14L, true
                                                 )
                                             }.onFailure {
                                                 module.log(
