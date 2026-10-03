@@ -237,21 +237,28 @@ object LauncherStabilityHook {
             loader.loadClass("com.android.quickstep.views.OplusRecentsViewImpl")
         }.getOrNull() ?: return 0
 
-        val oemHaptic = runCatching {
+        val clearAllHaptic = runCatching {
             loader.loadClass("com.android.common.util.ya")
                 .declaredMethods
                 .firstOrNull { method ->
-                    method.name == "c" &&
+                    method.name == "e" &&
                         method.parameterTypes.contentEquals(
                             arrayOf(
                                 Context::class.java,
                                 Int::class.javaPrimitiveType,
                                 Long::class.javaPrimitiveType,
-                                Boolean::class.javaPrimitiveType
+                                Int::class.javaPrimitiveType
                             )
                         )
                 }
                 ?.apply { isAccessible = true }
+        }.getOrNull()
+
+        val appFeatureUtils = runCatching {
+            val cls = loader.loadClass("com.android.common.util.AppFeatureUtils")
+            val instance = cls.getField("INSTANCE").get(null)
+            val method = cls.getMethod("isSupportKillProgramWave")
+            Pair(instance, method)
         }.getOrNull()
 
         var count = 0
@@ -300,8 +307,10 @@ object LauncherStabilityHook {
         // 2) Swipe-up task dismissal:
         //    ColorOS sets this flag to true only after the dismiss is committed, then resets
         //    it after the page transition. Hook that exact commit signal so a cancelled/partial
-        //    upward drag never vibrates. Reuse the same OEM motor effect used by
-        //    computeScrollHelper(): ya.c(context, 68, 65L, true).
+        //    upward drag never vibrates. Reuse the EXACT clear-all button haptic:
+        //
+        //      waveId = isSupportKillProgramWave() ? 472 : 50
+        //      ya.e(context, waveId, 0L, 12)
         cls.declaredMethods
             .filter {
                 it.name == "setSnapImmediatelyVibrateByTaskDismiss" &&
@@ -322,14 +331,18 @@ object LauncherStabilityHook {
                             if (config.hapticEffects && enabled) {
                                 val host = chain.thisObject
                                 val context = (host as? View)?.context
-                                if (context != null && oemHaptic != null) {
+                                if (context != null && clearAllHaptic != null) {
                                     runCatching {
-                                        oemHaptic.invoke(null, context, 68, 65L, true)
+                                        val supportKillWave = appFeatureUtils?.let { (instance, method) ->
+                                            (method.invoke(instance) as? Boolean) == true
+                                        } ?: false
+                                        val waveId = if (supportKillWave) 472 else 50
+                                        clearAllHaptic.invoke(null, context, waveId, 0L, 12)
                                     }.onFailure {
                                         module.log(
                                             Log.WARN,
                                             TAG,
-                                            "dismiss OEM haptic failed: ${it.message}"
+                                            "dismiss clear-all haptic failed: ${it.message}"
                                         )
                                     }
                                 }
@@ -350,7 +363,7 @@ object LauncherStabilityHook {
         module.log(
             Log.INFO,
             TAG,
-            "native haptic hooks installed x$count; oemHelper=${oemHaptic != null}"
+            "native haptic hooks installed x$count; clearAllHaptic=${clearAllHaptic != null}"
         )
         return count
     }
