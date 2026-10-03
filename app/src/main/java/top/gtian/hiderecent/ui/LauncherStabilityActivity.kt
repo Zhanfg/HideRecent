@@ -37,6 +37,22 @@ class LauncherStabilityActivity : AppCompatActivity() {
             LauncherStabilityPrefs.KEY_HAPTIC_EFFECTS
         )
         bind(
+            findViewById(R.id.switchHideWorkspaceLabels),
+            LauncherStabilityPrefs.KEY_HIDE_WORKSPACE_LABELS
+        )
+        bind(
+            findViewById(R.id.switchHideDrawerLabels),
+            LauncherStabilityPrefs.KEY_HIDE_DRAWER_LABELS
+        )
+        bind(
+            findViewById(R.id.switchHidePageIndicator),
+            LauncherStabilityPrefs.KEY_HIDE_PAGE_INDICATOR
+        )
+        bind(
+            findViewById(R.id.switchHideBottomSearch),
+            LauncherStabilityPrefs.KEY_HIDE_BOTTOM_SEARCH
+        )
+        bind(
             findViewById(R.id.switchHideTaskTitle),
             LauncherStabilityPrefs.KEY_HIDE_TASK_TITLE
         )
