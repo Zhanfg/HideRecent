@@ -33,9 +33,7 @@ class Main : XposedModule() {
         const val PREFS_PERMISSION = "cc.axymorrsen.launcherstability.permission.PREFS"
 
         val DEFAULT_RECENTS_HOST_PKGS = setOf(
-            "com.android.launcher",
-            "com.oplus.quickstep",
-            "com.oplus.launcher"
+            "com.android.launcher"
         )
 
         fun notifyPrefsChanged(ctx: Context, hidden: Set<String>) {
