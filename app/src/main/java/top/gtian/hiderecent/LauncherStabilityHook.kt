@@ -391,21 +391,21 @@ object LauncherStabilityHook {
         return count
     }
 
-    private fun firePageHaptic(host: Any?, args: Array<Any?>) {
+    private fun firePageHaptic(host: Any?, args: List<Any?>) {
         val now = SystemClock.elapsedRealtime()
         if (now - lastPageHapticAt < PAGE_HAPTIC_GAP_MS) return
         lastPageHapticAt = now
         performHaptic(host, args, HapticFeedbackConstants.SEGMENT_TICK)
     }
 
-    private fun fireActionHaptic(host: Any?, args: Array<Any?>, type: Int) {
+    private fun fireActionHaptic(host: Any?, args: List<Any?>, type: Int) {
         val now = SystemClock.elapsedRealtime()
         if (now - lastActionHapticAt < ACTION_HAPTIC_GAP_MS) return
         lastActionHapticAt = now
         performHaptic(host, args, type)
     }
 
-    private fun fireStrongHaptic(host: Any?, args: Array<Any?>, type: Int) {
+    private fun fireStrongHaptic(host: Any?, args: List<Any?>, type: Int) {
         val now = SystemClock.elapsedRealtime()
         if (now - lastStrongHapticAt < STRONG_HAPTIC_GAP_MS) return
         lastStrongHapticAt = now
@@ -420,7 +420,7 @@ object LauncherStabilityHook {
         )
     }
 
-    private fun performHaptic(host: Any?, args: Array<Any?>, type: Int): Boolean {
+    private fun performHaptic(host: Any?, args: List<Any?>, type: Int): Boolean {
         val view = findHapticView(host, args) ?: return false
         return performHapticOnView(view, type)
     }
@@ -437,7 +437,7 @@ object LauncherStabilityHook {
         }.getOrDefault(false)
     }
 
-    private fun findHapticView(host: Any?, args: Array<Any?>): View? {
+    private fun findHapticView(host: Any?, args: List<Any?>): View? {
         if (host is View) return host
 
         args.firstOrNull { it is View }?.let { return it as View }
