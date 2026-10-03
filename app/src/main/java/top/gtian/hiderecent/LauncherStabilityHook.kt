@@ -279,7 +279,7 @@ object LauncherStabilityHook {
         }
     }
 
-    private inline fun refreshList(
+    private fun refreshList(
         list: CopyOnWriteArrayList<WeakReference<Any>>,
         apply: (Any) -> Unit
     ) {
