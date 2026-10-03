@@ -80,7 +80,7 @@ class LauncherStabilityActivity : AppCompatActivity() {
             container,
             getString(R.string.haptic_profile_recents_enter),
             LauncherStabilityPrefs.KEY_RECENTS_ENTER_HAPTIC_PROFILE,
-            LauncherHapticProfile.IMPACT_SOFT
+            LauncherHapticProfile.NONE
         )
     }
 
