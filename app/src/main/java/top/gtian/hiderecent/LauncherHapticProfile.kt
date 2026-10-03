@@ -22,6 +22,13 @@ enum class LauncherHapticProfile(
     val amplitudes: IntArray?,
     val fallbackTimings: LongArray?
 ) {
+    NONE(
+        "none",
+        "None",
+        null,
+        null,
+        null
+    ),
     OEM_CLEAR_ALL(
         "oem_clear_all",
         "ColorOS Clear All",
@@ -101,7 +108,7 @@ enum class LauncherHapticProfile(
     );
 
     fun vibrate(context: Context): Boolean {
-        if (this == OEM_CLEAR_ALL) return false
+        if (this == NONE || this == OEM_CLEAR_ALL) return false
 
         val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             context.getSystemService(VibratorManager::class.java)?.defaultVibrator
@@ -133,6 +140,6 @@ enum class LauncherHapticProfile(
             entries.firstOrNull { it.prefValue == value } ?: OEM_CLEAR_ALL
 
         val previewable: List<LauncherHapticProfile>
-            get() = entries.filterNot { it == OEM_CLEAR_ALL }
+            get() = entries.filterNot { it == NONE || it == OEM_CLEAR_ALL }
     }
 }
