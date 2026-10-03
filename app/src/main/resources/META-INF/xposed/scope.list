@@ -1,13 +1,3 @@
-# Generic system_server layer (primary cross-ROM filtering)
-android
-system
-
-# AOSP / Launcher3 / Pixel Quickstep hosts
+# ColorOS / OPlus Launcher only.
+# Keep SystemUI, system_server and auxiliary Quickstep packages out of scope.
 com.android.launcher
-com.android.launcher3
-com.google.android.apps.nexuslauncher
-com.android.systemui
-
-# ColorOS / OPlus vendor enhancement layer
-com.oplus.quickstep
-com.oplus.launcher
