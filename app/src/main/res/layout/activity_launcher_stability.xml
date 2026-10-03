@@ -62,10 +62,27 @@
                 android:textStyle="bold" />
 
             <androidx.appcompat.widget.SwitchCompat
-                android:id="@+id/switchHideTaskTitle"
+                android:id="@+id/switchHapticEffects"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
+                android:minHeight="52dp"
+                android:text="@string/haptic_effects" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="@string/haptic_effects_desc"
+                android:textColor="@android:color/darker_gray"
+                android:textSize="13sp" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switchHideTaskTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
                 android:minHeight="52dp"
                 android:text="@string/hide_task_title" />
 
