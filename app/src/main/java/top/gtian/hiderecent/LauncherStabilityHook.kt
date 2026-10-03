@@ -37,7 +37,6 @@ object LauncherStabilityHook {
     @Volatile private var remotePrefs: SharedPreferences? = null
     @Volatile private var prefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
     @Volatile private var lastDismissStartHapticAt = 0L
-    @Volatile private var lastDismissTerminalHapticAt = 0L
 
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
     private val headers = CopyOnWriteArrayList<WeakReference<Any>>()
@@ -96,7 +95,6 @@ object LauncherStabilityHook {
         clearPanels.clear()
         originalVisibility.clear()
         lastDismissStartHapticAt = 0L
-        lastDismissTerminalHapticAt = 0L
     }
 
     private fun attachPrefs(module: Main) {
@@ -259,23 +257,6 @@ object LauncherStabilityHook {
                 ?.apply { isAccessible = true }
         }.getOrNull()
 
-        val softTerminalHaptic = runCatching {
-            loader.loadClass("com.android.common.util.ya")
-                .declaredMethods
-                .firstOrNull { method ->
-                    method.name == "c" &&
-                        method.parameterTypes.contentEquals(
-                            arrayOf(
-                                Context::class.java,
-                                Int::class.javaPrimitiveType,
-                                Long::class.javaPrimitiveType,
-                                Boolean::class.javaPrimitiveType
-                            )
-                        )
-                }
-                ?.apply { isAccessible = true }
-        }.getOrNull()
-
         val appFeatureUtils = runCatching {
             val featureCls = loader.loadClass("com.android.common.util.AppFeatureUtils")
             val instance = featureCls.getField("INSTANCE").get(null)
@@ -352,67 +333,10 @@ object LauncherStabilityHook {
                 }
             }
 
-        // 3) Dismiss COMMIT: only a tiny terminal pulse to close the tactile envelope.
-        //    If no recent start pulse exists, fall back to Clear All feedback.
-        cls.declaredMethods
-            .filter {
-                it.name == "setSnapImmediatelyVibrateByTaskDismiss" &&
-                    it.parameterTypes.contentEquals(
-                        arrayOf(Boolean::class.javaPrimitiveType)
-                    )
-            }
-            .forEachIndexed { index, method ->
-                method.isAccessible = true
-                runCatching {
-                    module.hook(method)
-                        .setId("launcher17312/haptic/dismissCommit/$index")
-                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                        .intercept { chain ->
-                            val enabled = (chain.args.firstOrNull() as? Boolean) == true
-                            val result = chain.proceed()
-                            if (config.hapticEffects && enabled) {
-                                val context = (chain.thisObject as? View)?.context
-                                if (context != null) {
-                                    val now = SystemClock.elapsedRealtime()
-                                    val recentStart = now - lastDismissStartHapticAt in 0L..1200L
-                                    if (recentStart && softTerminalHaptic != null) {
-                                        if (now - lastDismissTerminalHapticAt >= 90L) {
-                                            lastDismissTerminalHapticAt = now
-                                            runCatching {
-                                                softTerminalHaptic.invoke(
-                                                    null, context, 68, 14L, true
-                                                )
-                                            }.onFailure {
-                                                module.log(
-                                                    Log.WARN,
-                                                    TAG,
-                                                    "dismiss terminal haptic failed: ${it.message}"
-                                                )
-                                            }
-                                        }
-                                    } else if (clearAllHaptic != null) {
-                                        performClearAllHaptic(
-                                            module, context, clearAllHaptic, appFeatureUtils
-                                        )
-                                    }
-                                }
-                            }
-                            result
-                        }
-                    count++
-                }.onFailure {
-                    module.log(
-                        Log.WARN,
-                        TAG,
-                        "dismiss-commit haptic hook failed: ${it.message}"
-                    )
-                }
-            }
-
         module.log(
             Log.INFO,
             TAG,
-            "native haptic hooks installed x$count; clearAll=${clearAllHaptic != null}; terminal=${softTerminalHaptic != null}"
+            "native haptic hooks installed x$count; clearAll=${clearAllHaptic != null}"
         )
         return count
     }
