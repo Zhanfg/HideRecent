@@ -519,6 +519,32 @@ class LauncherStabilityActivity : AppCompatActivity() {
             getString(R.string.perf_engine_enabled_desc)
         )
 
+        addSection(container, getString(R.string.perf_oem_native_section))
+        addSwitch(
+            container,
+            getString(R.string.perf_oem_async_task_launch),
+            LauncherStabilityPrefs.KEY_PERF_OEM_ASYNC_TASK_LAUNCH,
+            getString(R.string.perf_oem_async_task_launch_desc)
+        )
+        addSwitch(
+            container,
+            getString(R.string.perf_oem_interrupt_spring),
+            LauncherStabilityPrefs.KEY_PERF_OEM_INTERRUPT_SPRING,
+            getString(R.string.perf_oem_interrupt_spring_desc)
+        )
+        addSwitch(
+            container,
+            getString(R.string.perf_oem_async_spring_scroll),
+            LauncherStabilityPrefs.KEY_PERF_OEM_ASYNC_SPRING_SCROLL,
+            getString(R.string.perf_oem_async_spring_scroll_desc)
+        )
+        addSwitch(
+            container,
+            getString(R.string.perf_oem_swipe_home_spring),
+            LauncherStabilityPrefs.KEY_PERF_OEM_SWIPE_HOME_SPRING,
+            getString(R.string.perf_oem_swipe_home_spring_desc)
+        )
+
         addSection(container, getString(R.string.perf_recents_section))
         addSwitch(
             container,
