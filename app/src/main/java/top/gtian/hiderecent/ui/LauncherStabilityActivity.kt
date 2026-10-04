@@ -205,6 +205,12 @@ class LauncherStabilityActivity : AppCompatActivity() {
         )
         addSwitch(
             container,
+            getString(R.string.recents_long_press_app_info),
+            LauncherStabilityPrefs.KEY_RECENTS_LONG_PRESS_APP_INFO,
+            getString(R.string.recents_long_press_app_info_desc)
+        )
+        addSwitch(
+            container,
             getString(R.string.disable_auto_focus_next_task),
             LauncherStabilityPrefs.KEY_DISABLE_AUTO_FOCUS_NEXT_TASK,
             getString(R.string.disable_auto_focus_next_task_desc)
