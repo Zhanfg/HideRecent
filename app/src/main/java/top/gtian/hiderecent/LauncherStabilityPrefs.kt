@@ -86,6 +86,13 @@ object LauncherStabilityPrefs {
     const val KEY_PERF_ADAPTIVE_RECENTS = "perf_adaptive_recents"
     const val KEY_PERF_DECISIVE_FLING = "perf_decisive_fling"
     const val KEY_PERF_WORKSPACE_DRAG_PAGING = "perf_workspace_drag_paging"
+
+    // OPlus native performance/animation gates verified in Launcher 17.3.12.
+    const val KEY_PERF_OEM_ASYNC_TASK_LAUNCH = "perf_oem_async_task_launch"
+    const val KEY_PERF_OEM_INTERRUPT_SPRING = "perf_oem_interrupt_spring"
+    const val KEY_PERF_OEM_ASYNC_SPRING_SCROLL = "perf_oem_async_spring_scroll"
+    const val KEY_PERF_OEM_SWIPE_HOME_SPRING = "perf_oem_swipe_home_spring"
+
     const val KEY_PERF_RECENTS_SETTLE_FLOOR = "perf_recents_settle_floor"
     const val KEY_PERF_FLING_GAIN = "perf_fling_gain"
     const val KEY_PERF_DRAG_PAGE_MULTIPLIER = "perf_drag_page_multiplier"
@@ -152,6 +159,10 @@ object LauncherStabilityPrefs {
         KEY_PERF_ADAPTIVE_RECENTS,
         KEY_PERF_DECISIVE_FLING,
         KEY_PERF_WORKSPACE_DRAG_PAGING,
+        KEY_PERF_OEM_ASYNC_TASK_LAUNCH,
+        KEY_PERF_OEM_INTERRUPT_SPRING,
+        KEY_PERF_OEM_ASYNC_SPRING_SCROLL,
+        KEY_PERF_OEM_SWIPE_HOME_SPRING,
 
         KEY_FLEX_BRIDGE_ENABLED,
         KEY_FLEX_ZOOM_DEBOUNCE,
