@@ -355,13 +355,21 @@ internal object FlexibleWindowBridge {
             }
 
         // Any surface/task lifecycle boundary invalidates geometry de-duplication state.
+        // This is deliberately broader than just Surface lifecycle: a replaced/new task may
+        // legitimately need resize(Rect) even when its first bounds equal the previous task.
         cls.declaredMethods
             .filter {
                 it.name in setOf(
                     "init",
                     "surfaceReplaced",
                     "release",
-                    "onActivityResumed"
+                    "onActivityResumed",
+                    "onTaskAppeared",
+                    "onTaskInfoChanged",
+                    "onTaskReplaced",
+                    "onTaskRectOrientationChanged",
+                    "onTaskVanished",
+                    "onTaskReparent"
                 )
             }
             .forEachIndexed { index, method ->
