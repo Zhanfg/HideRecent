@@ -49,6 +49,8 @@
     <string name="remove_update_green_dot_desc">关闭 BubbleTextView 的更新绿点判定，不影响通知圆点。</string>
     <string name="hide_recents_dock">隐藏最近任务底部 Dock 图标</string>
     <string name="hide_recents_dock_desc">让最近任务 DockView 进入隐藏状态，不修改任务卡片本体。</string>
+    <string name="recents_long_press_app_info">长按最近任务图标打开应用详情</string>
+    <string name="recents_long_press_app_info_desc">在 OplusTaskViewImpl 绑定任务图标后包装图标和标题长按；关闭时继续走系统原有长按行为。</string>
     <string name="disable_auto_focus_next_task">关闭后台自动聚焦下一任务</string>
     <string name="disable_auto_focus_next_task_desc">关闭 AppFeatureUtils 的 Overview 自动跳下一卡逻辑，减少卡片关闭后自动偏移。</string>
     <string name="enable_indicator_entry">启用桌面指示器菜单入口</string>
