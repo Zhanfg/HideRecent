@@ -240,6 +240,42 @@ class LauncherStabilityActivity : AppCompatActivity() {
             getString(R.string.unlock_task_lock_limit_desc)
         )
 
+        addSection(container, getString(R.string.ext_icon_title))
+
+        addSwitch(
+            container,
+            getString(R.string.custom_icon_size_enabled),
+            LauncherStabilityPrefs.KEY_CUSTOM_ICON_SIZE_ENABLED,
+            getString(R.string.custom_icon_size_enabled_desc)
+        )
+        addIntSlider(
+            container,
+            getString(R.string.icon_size_dp),
+            LauncherStabilityPrefs.KEY_ICON_SIZE_DP,
+            36,
+            96,
+            56,
+            { value -> "$value dp" }
+        )
+        addSwitch(
+            container,
+            getString(R.string.remove_shortcut_badge),
+            LauncherStabilityPrefs.KEY_REMOVE_SHORTCUT_BADGE,
+            getString(R.string.remove_shortcut_badge_desc)
+        )
+        addSwitch(
+            container,
+            getString(R.string.remove_work_badge),
+            LauncherStabilityPrefs.KEY_REMOVE_WORK_BADGE,
+            getString(R.string.remove_work_badge_desc)
+        )
+        addSwitch(
+            container,
+            getString(R.string.remove_clone_badge),
+            LauncherStabilityPrefs.KEY_REMOVE_CLONE_BADGE,
+            getString(R.string.remove_clone_badge_desc)
+        )
+
         addSection(container, getString(R.string.ext_dock_title))
 
         addSwitch(
