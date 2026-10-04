@@ -292,6 +292,12 @@ class LauncherStabilityActivity : AppCompatActivity() {
         )
         addSwitch(
             container,
+            getString(R.string.restore_pin_capsule),
+            LauncherStabilityPrefs.KEY_RESTORE_PIN_CAPSULE,
+            getString(R.string.restore_pin_capsule_desc)
+        )
+        addSwitch(
+            container,
             getString(R.string.disable_auto_focus_next_task),
             LauncherStabilityPrefs.KEY_DISABLE_AUTO_FOCUS_NEXT_TASK,
             getString(R.string.disable_auto_focus_next_task_desc)
