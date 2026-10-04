@@ -27,6 +27,7 @@ import top.gtian.hiderecent.LauncherHapticProfile
 import top.gtian.hiderecent.LauncherStabilityPrefs
 import top.gtian.hiderecent.R
 import kotlin.math.round
+import kotlin.math.roundToInt
 
 class LauncherStabilityActivity : AppCompatActivity() {
     private lateinit var prefs: SharedPreferences
