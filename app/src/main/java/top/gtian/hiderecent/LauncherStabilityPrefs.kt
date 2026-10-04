@@ -55,6 +55,27 @@ object LauncherStabilityPrefs {
     const val KEY_CUSTOM_ICON_SIZE_ENABLED = "custom_icon_size_enabled"
     const val KEY_ICON_SIZE_DP = "icon_size_dp"
 
+    // Experimental animation engine. All disabled by default.
+    const val KEY_ANIM_ENGINE_ENABLED = "anim_engine_enabled"
+    const val KEY_ANIM_ICON_PULSE = "anim_icon_pulse"
+    const val KEY_ANIM_ICON_TILT = "anim_icon_tilt"
+    const val KEY_ANIM_RECENTS_TILT = "anim_recents_tilt"
+    const val KEY_ANIM_SPRING_TUNING = "anim_spring_tuning"
+    const val KEY_ANIM_SNAP_TUNING = "anim_snap_tuning"
+    const val KEY_ANIM_OVERSCROLL_TUNING = "anim_overscroll_tuning"
+    const val KEY_ANIM_FLING_TUNING = "anim_fling_tuning"
+    const val KEY_ANIM_RUNNING_SCALE = "anim_running_scale"
+
+    const val KEY_ANIM_ICON_PULSE_SCALE = "anim_icon_pulse_scale"
+    const val KEY_ANIM_ICON_TILT_DEG = "anim_icon_tilt_deg"
+    const val KEY_ANIM_RECENTS_TILT_DEG = "anim_recents_tilt_deg"
+    const val KEY_ANIM_SPRING_STIFFNESS = "anim_spring_stiffness"
+    const val KEY_ANIM_SPRING_DAMPING = "anim_spring_damping"
+    const val KEY_ANIM_SNAP_MULTIPLIER = "anim_snap_multiplier"
+    const val KEY_ANIM_OVERSCROLL_MULTIPLIER = "anim_overscroll_multiplier"
+    const val KEY_ANIM_FLING_MULTIPLIER = "anim_fling_multiplier"
+    const val KEY_ANIM_RUNNING_SCALE_VALUE = "anim_running_scale_value"
+
     val BOOLEAN_KEYS = arrayOf(
         KEY_HAPTIC_EFFECTS,
         KEY_HIDE_WORKSPACE_LABELS,
@@ -90,7 +111,16 @@ object LauncherStabilityPrefs {
         KEY_FOLDER_GRID_ENABLED,
         KEY_DRAWER_GRID_ENABLED,
         KEY_FORCE_FOLD_MODE,
-        KEY_CUSTOM_ICON_SIZE_ENABLED
+        KEY_CUSTOM_ICON_SIZE_ENABLED,
+        KEY_ANIM_ENGINE_ENABLED,
+        KEY_ANIM_ICON_PULSE,
+        KEY_ANIM_ICON_TILT,
+        KEY_ANIM_RECENTS_TILT,
+        KEY_ANIM_SPRING_TUNING,
+        KEY_ANIM_SNAP_TUNING,
+        KEY_ANIM_OVERSCROLL_TUNING,
+        KEY_ANIM_FLING_TUNING,
+        KEY_ANIM_RUNNING_SCALE
     )
 
     val STRING_KEYS = arrayOf(
@@ -111,7 +141,16 @@ object LauncherStabilityPrefs {
 
     val FLOAT_KEYS = arrayOf(
         KEY_DOCK_ALPHA,
-        KEY_BLUR_CORNER_DP
+        KEY_BLUR_CORNER_DP,
+        KEY_ANIM_ICON_PULSE_SCALE,
+        KEY_ANIM_ICON_TILT_DEG,
+        KEY_ANIM_RECENTS_TILT_DEG,
+        KEY_ANIM_SPRING_STIFFNESS,
+        KEY_ANIM_SPRING_DAMPING,
+        KEY_ANIM_SNAP_MULTIPLIER,
+        KEY_ANIM_OVERSCROLL_MULTIPLIER,
+        KEY_ANIM_FLING_MULTIPLIER,
+        KEY_ANIM_RUNNING_SCALE_VALUE
     )
 
     val ALL_KEYS =
@@ -134,6 +173,15 @@ object LauncherStabilityPrefs {
     fun floatDefault(key: String): Float = when (key) {
         KEY_DOCK_ALPHA -> 1f
         KEY_BLUR_CORNER_DP -> 28f
+        KEY_ANIM_ICON_PULSE_SCALE -> 0.94f
+        KEY_ANIM_ICON_TILT_DEG -> 4f
+        KEY_ANIM_RECENTS_TILT_DEG -> 6f
+        KEY_ANIM_SPRING_STIFFNESS -> 1f
+        KEY_ANIM_SPRING_DAMPING -> 1f
+        KEY_ANIM_SNAP_MULTIPLIER -> 1f
+        KEY_ANIM_OVERSCROLL_MULTIPLIER -> 1f
+        KEY_ANIM_FLING_MULTIPLIER -> 1f
+        KEY_ANIM_RUNNING_SCALE_VALUE -> 1f
         else -> 0f
     }
 }
