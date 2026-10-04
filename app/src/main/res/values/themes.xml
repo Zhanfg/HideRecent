@@ -1,26 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!--
-      顶部结构与 PackageViewer 一致：
-        colorPrimary     = 亮紫 #6200EE → 标题栏背景（标题文字、溢出图标白色）
-        colorPrimaryDark = 深紫 #3700B3 → 状态栏背景（状态栏图标/文字白色）
-
-      为什么改成 NoActionBar + 显式 Toolbar：
-      主题自带 ActionBar 在系统强制 edge-to-edge（Android 15+ / ColorOS）时会被顶进状态栏区域，
-      表现为「整条紫色、标题文字被状态栏盖住 = 标签栏不见了」。
-      现在状态栏高度不写死，由 MainActivity 用 WindowInsets 撑在 @id/statusBarSpacer 上，
-      标题栏永远完整可见：深紫状态栏 + 亮紫标题栏 + 白色标题。
-    -->
-    <style name="Theme.App" parent="Theme.AppCompat.Light.NoActionBar">
-        <item name="colorPrimary">@color/purple_500</item>
-        <item name="colorPrimaryDark">@color/purple_700</item>
-        <item name="colorAccent">@color/purple_700</item>
-        <!-- 双保险：即使某些 ROM 忽略 NoActionBar，也不给系统 ActionBar 留位置 -->
+    <style name="Theme.App" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/md_seed_primary</item>
+        <item name="colorSecondary">@color/md_seed_secondary</item>
+        <item name="colorTertiary">@color/md_seed_tertiary</item>
+        <item name="android:fontFamily">sans</item>
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
-        <!-- 状态栏：深紫 + 白色图标/文字 -->
-        <item name="android:statusBarColor">@color/purple_700</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowBackground">@color/white</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">?attr/colorSurface</item>
+        <item name="android:windowBackground">?attr/colorSurface</item>
+        <item name="android:windowDisablePreview">false</item>
     </style>
+
+    <style name="ShapeAppearance.LauncherStability.Card"
+        parent="ShapeAppearance.Material3.Corner.ExtraLarge" />
+
+    <style name="ShapeAppearance.LauncherStability.Control"
+        parent="ShapeAppearance.Material3.Corner.Large" />
 </resources>
