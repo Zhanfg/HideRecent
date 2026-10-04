@@ -6,6 +6,8 @@
     <string name="launcher_baseline">基线：系统桌面 17.3.12 · Android 17</string>
     <string name="launcher_strategy">官方 Launcher APK 保持不变；功能通过 LSPosed 运行时注入。检测到旧 ZuyQA 重打包类时将自动拒绝注入。</string>
     <string name="launcher_safe_features">Safe Features</string>
+    <string name="haptic_card_title">触觉反馈</string>
+    <string name="recents_display_title">最近任务显示</string>
 
     <string name="haptic_effects">震动特效</string>
     <string name="haptic_effects_desc">横向堆叠滑动继续使用已经验证准确的 ColorOS 原生速度阈值；单卡关闭、全部清空、进入最近任务可以分别选择触觉 profile。</string>
@@ -107,8 +109,47 @@
     <string name="fold_mode_expanded">展开态</string>
     <string name="fold_mode_folded">折叠态</string>
 
-    <string name="launcher_risk_note">扩展功能均为独立运行时门控，默认关闭。Grid、Fold、Dock 模糊和默认主页属于实验项；Window Tilt、LayerGeometry、自定义 Spring、Cascade Recents 等直接改 Surface/动画矩阵的高风险功能仍未默认接入。</string>
-    <string name="launcher_apply_note">触觉 profile 保存后立即同步到 Launcher；若桌面进程仍缓存旧模块代码，重启系统桌面进程。</string>
+    <string name="animation_engine_title">实验动画引擎</string>
+    <string name="animation_engine_desc">所有动画增强都有独立总开关。实现限制在 Launcher View、OEM Animator 与现有 Recents Spring 层，不直接写 SurfaceControl.Transaction 矩阵。</string>
+
+    <string name="anim_master_section">总开关</string>
+    <string name="anim_engine_enabled">启用实验动画引擎</string>
+    <string name="anim_engine_enabled_desc">关闭时所有动画 Hook 都保持原厂透传；建议先打开总开关，再逐项启用。</string>
+
+    <string name="anim_app_section">应用开合 / Break / Home</string>
+    <string name="anim_icon_pulse">应用开合图标物理脉冲</string>
+    <string name="anim_icon_pulse_desc">在 APP_LAUNCH / APP_CLOSE / TASK_VIEW_LAUNCH 起点对来源图标做短促压缩与回弹，不触碰远端窗口 Surface。</string>
+    <string name="anim_icon_pulse_scale">脉冲最小缩放</string>
+    <string name="anim_icon_tilt">应用开合 3D 微倾斜</string>
+    <string name="anim_icon_tilt_desc">给来源图标增加很短的 Y 轴透视倾斜；关闭或动画结束会恢复原始 rotationY。</string>
+    <string name="anim_icon_tilt_deg">图标倾斜角度</string>
+    <string name="anim_transition_timing">调整开合 / Break 动画时序</string>
+    <string name="anim_transition_timing_desc">对 OPlus 动画集合中 APP、BREAK、SWIPE、HOME、TASK_VIEW 类型的 Android Animator 保留原插值器，仅按比例调整 duration。</string>
+    <string name="anim_transition_multiplier">动画时长倍率</string>
+
+    <string name="anim_recents_section">堆叠后台 / 抛掷 / Spring</string>
+    <string name="anim_recents_tilt">堆叠后台 3D 空间倾斜</string>
+    <string name="anim_recents_tilt_desc">根据卡片相对屏幕中心的位置动态设置 TaskView rotationY，形成左右连续透视；离开或关闭后恢复原值。</string>
+    <string name="anim_recents_tilt_deg">最大倾斜角度</string>
+    <string name="anim_running_scale">运行任务空间缩放</string>
+    <string name="anim_running_scale_desc">在系统 getTargetRunningTaskScale 的原值上做小范围倍率调整，用于控制堆叠后台纵深感。</string>
+    <string name="anim_running_scale_value">运行任务缩放倍率</string>
+    <string name="anim_snap_tuning">调整卡片吸附时长</string>
+    <string name="anim_snap_tuning_desc">按倍率调整 getPageSnapAnimationDuration；小于 1 更利落，大于 1 更柔和。</string>
+    <string name="anim_snap_multiplier">吸附时长倍率</string>
+    <string name="anim_overscroll_tuning">调整边缘弹性</string>
+    <string name="anim_overscroll_tuning_desc">缩放系统 getSmoothOverScrollAmount 的结果，控制后台滑到边缘时的回弹幅度。</string>
+    <string name="anim_overscroll_multiplier">边缘弹性倍率</string>
+    <string name="anim_fling_tuning">调整卡片抛掷响应</string>
+    <string name="anim_fling_tuning_desc">仅在 shouldFlingForVelocity 判定前缩放速度输入，不改手势轨迹；大于 1 更容易触发 fling。</string>
+    <string name="anim_fling_multiplier">Fling 响应倍率</string>
+    <string name="anim_spring_tuning">调整后台移动 Spring</string>
+    <string name="anim_spring_tuning_desc">在 OPlus applyMoveSpringConfig 完成后读取 AndroidX SpringForce，再按比例调整 stiffness / dampingRatio。</string>
+    <string name="anim_spring_stiffness">Spring 刚度倍率</string>
+    <string name="anim_spring_damping">Spring 阻尼倍率</string>
+
+    <string name="launcher_risk_note">实验动画总开关默认关闭。当前 3D 倾斜采用 View 层等效实现，并保留 OEM Animator / Spring 主链；旧第一版 ZuyqaWindowTilt 那种直接写 SurfaceControl.Transaction 矩阵的实现仍被隔离，避免重新引入锁屏、桌面卡死或黑帧风险。</string>
+    <string name="launcher_apply_note">运行时配置已连接 · 修改普通开关即时同步；新增 Hook 类型或升级模块后重启系统桌面进程。</string>
 
     <string name="search">搜索</string>
     <string name="orderBy">排序</string>
