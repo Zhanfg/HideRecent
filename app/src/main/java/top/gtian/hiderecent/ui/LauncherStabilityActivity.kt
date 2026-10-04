@@ -299,6 +299,12 @@ class LauncherStabilityActivity : AppCompatActivity() {
         )
         addSwitch(
             container,
+            getString(R.string.restore_floating_window_shortcut),
+            LauncherStabilityPrefs.KEY_RESTORE_FLOATING_WINDOW_SHORTCUT,
+            getString(R.string.restore_floating_window_shortcut_desc)
+        )
+        addSwitch(
+            container,
             getString(R.string.recents_long_press_app_info),
             LauncherStabilityPrefs.KEY_RECENTS_LONG_PRESS_APP_INFO,
             getString(R.string.recents_long_press_app_info_desc)
