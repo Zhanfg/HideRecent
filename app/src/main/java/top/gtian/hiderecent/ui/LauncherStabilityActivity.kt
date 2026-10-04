@@ -90,6 +90,7 @@ class LauncherStabilityActivity : AppCompatActivity() {
         buildHapticLab(findViewById(R.id.hapticLabContainer))
         buildExtendedFeatures(findViewById(R.id.extendedFeatureContainer))
         buildPerformanceFeatures(findViewById(R.id.performanceFeatureContainer))
+        buildFlexibleWindowFeatures(findViewById(R.id.flexibleWindowFeatureContainer))
         buildAnimationFeatures(findViewById(R.id.animationFeatureContainer))
 
         findViewById<TextView>(R.id.statusText).text =
@@ -561,6 +562,63 @@ class LauncherStabilityActivity : AppCompatActivity() {
             0.72f,
             45
         ) { String.format("%.2f×", it) }
+    }
+
+    private fun buildFlexibleWindowFeatures(container: LinearLayout) {
+        addSection(container, getString(R.string.flex_master_section))
+        addSwitch(
+            container,
+            getString(R.string.flex_bridge_enabled),
+            LauncherStabilityPrefs.KEY_FLEX_BRIDGE_ENABLED,
+            getString(R.string.flex_bridge_enabled_desc)
+        )
+
+        addSection(container, getString(R.string.flex_sidebar_section))
+        addSwitch(
+            container,
+            getString(R.string.flex_zoom_debounce),
+            LauncherStabilityPrefs.KEY_FLEX_ZOOM_DEBOUNCE,
+            getString(R.string.flex_zoom_debounce_desc)
+        )
+        addIntSlider(
+            container,
+            getString(R.string.flex_zoom_debounce_ms),
+            LauncherStabilityPrefs.KEY_FLEX_ZOOM_DEBOUNCE_MS,
+            80,
+            600,
+            220
+        ) { "$it ms" }
+
+        addSwitch(
+            container,
+            getString(R.string.flex_split_debounce),
+            LauncherStabilityPrefs.KEY_FLEX_SPLIT_DEBOUNCE,
+            getString(R.string.flex_split_debounce_desc)
+        )
+        addIntSlider(
+            container,
+            getString(R.string.flex_split_debounce_ms),
+            LauncherStabilityPrefs.KEY_FLEX_SPLIT_DEBOUNCE_MS,
+            100,
+            800,
+            280
+        ) { "$it ms" }
+
+        addSection(container, getString(R.string.flex_canvas_section))
+        addSwitch(
+            container,
+            getString(R.string.flex_resize_dedup),
+            LauncherStabilityPrefs.KEY_FLEX_RESIZE_DEDUP,
+            getString(R.string.flex_resize_dedup_desc)
+        )
+        addIntSlider(
+            container,
+            getString(R.string.flex_resize_dedup_ms),
+            LauncherStabilityPrefs.KEY_FLEX_RESIZE_DEDUP_MS,
+            4,
+            40,
+            16
+        ) { "$it ms" }
     }
 
     private fun buildAnimationFeatures(container: LinearLayout) {
