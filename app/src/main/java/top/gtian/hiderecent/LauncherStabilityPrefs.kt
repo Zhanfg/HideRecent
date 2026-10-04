@@ -2,6 +2,7 @@ package top.gtian.hiderecent
 
 object LauncherStabilityPrefs {
     const val PREFS_NAME = "launcher_stability"
+    const val KEY_USE_DYNAMIC_COLOR = "use_dynamic_color"
 
     const val KEY_HAPTIC_EFFECTS = "haptic_effects"
     const val KEY_DISMISS_HAPTIC_PROFILE = "dismiss_haptic_profile"
