@@ -24,6 +24,7 @@ object LauncherStabilityPrefs {
     const val KEY_REMOVE_FOLDER_PREVIEW_BG = "remove_folder_preview_bg"
     const val KEY_REMOVE_UPDATE_GREEN_DOT = "remove_update_green_dot"
     const val KEY_HIDE_RECENTS_DOCK = "hide_recents_dock"
+    const val KEY_RESTORE_PIN_CAPSULE = "restore_pin_capsule"
     const val KEY_RECENTS_LONG_PRESS_APP_INFO = "recents_long_press_app_info"
     const val KEY_DISABLE_AUTO_FOCUS_NEXT_TASK = "disable_auto_focus_next_task"
     const val KEY_ENABLE_INDICATOR_ENTRY = "enable_indicator_entry"
@@ -103,6 +104,7 @@ object LauncherStabilityPrefs {
         KEY_REMOVE_FOLDER_PREVIEW_BG,
         KEY_REMOVE_UPDATE_GREEN_DOT,
         KEY_HIDE_RECENTS_DOCK,
+        KEY_RESTORE_PIN_CAPSULE,
         KEY_RECENTS_LONG_PRESS_APP_INFO,
         KEY_DISABLE_AUTO_FOCUS_NEXT_TASK,
         KEY_ENABLE_INDICATOR_ENTRY,
