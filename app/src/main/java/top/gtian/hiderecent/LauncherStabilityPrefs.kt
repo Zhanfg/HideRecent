@@ -107,4 +107,20 @@ object LauncherStabilityPrefs {
             STRING_KEYS.toSet() +
             INT_KEYS.toSet() +
             FLOAT_KEYS.toSet()
+
+    fun intDefault(key: String): Int = when (key) {
+        KEY_DOCK_MAX_ITEMS -> 8
+        KEY_DEFAULT_HOME_PAGE -> 0
+        KEY_FOLDER_ROWS -> 4
+        KEY_FOLDER_COLUMNS -> 3
+        KEY_DRAWER_COLUMNS -> 4
+        KEY_FOLD_MODE -> 0
+        else -> 0
+    }
+
+    fun floatDefault(key: String): Float = when (key) {
+        KEY_DOCK_ALPHA -> 1f
+        KEY_BLUR_CORNER_DP -> 28f
+        else -> 0f
+    }
 }
