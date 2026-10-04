@@ -1,3 +1,5 @@
-# ColorOS / OPlus Launcher only.
-# Keep SystemUI, system_server and auxiliary Quickstep packages out of scope.
+# ColorOS 17 launcher + isolated flexible-window UI processes.
+# system_server and SystemUI remain deliberately out of scope.
 com.android.launcher
+com.coloros.smartsidebar
+com.oplus.pscanvas
