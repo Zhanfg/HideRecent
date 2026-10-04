@@ -10,9 +10,12 @@ import android.view.View
 import android.widget.TextView
 import io.github.libxposed.api.XposedInterface
 import java.lang.ref.WeakReference
+import java.lang.reflect.Field
+import java.lang.reflect.Method
 import java.util.Collections
 import java.util.WeakHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -71,6 +74,12 @@ object LauncherStabilityHook {
     private val originalTextPaintAlpha = Collections.synchronizedMap(
         WeakHashMap<TextView, Int>()
     )
+
+    // Reflection caches for scroll-haptic hot paths. Resolve once per runtime class.
+    private val fieldCache = ConcurrentHashMap<String, Field>()
+    private val missingFields = ConcurrentHashMap.newKeySet<String>()
+    private val noArgMethodCache = ConcurrentHashMap<String, Method>()
+    private val missingNoArgMethods = ConcurrentHashMap.newKeySet<String>()
 
     private val legacyMarkers = arrayOf(
         "com.android.quickstep.util.animation.ZuyqaWindowTilt",
@@ -196,6 +205,7 @@ object LauncherStabilityHook {
         installed += hookHaptics(module, loader)
         installed += LauncherExtendedFeatures.hook(module, loader)
         installed += LauncherAnimationEngine.hook(module, loader)
+        installed += LauncherPerformanceEngine.hook(module, loader)
 
         module.log(
             if (installed > 0) Log.INFO else Log.WARN,
@@ -217,6 +227,11 @@ object LauncherStabilityHook {
         config = Config()
         LauncherExtendedFeatures.reset()
         LauncherAnimationEngine.reset()
+        LauncherPerformanceEngine.reset()
+        fieldCache.clear()
+        missingFields.clear()
+        noArgMethodCache.clear()
+        missingNoArgMethods.clear()
         headers.clear()
         clearPanels.clear()
         bubbleLabels.clear()
@@ -297,6 +312,7 @@ object LauncherStabilityHook {
         )
         LauncherExtendedFeatures.refresh(prefs)
         LauncherAnimationEngine.refresh(prefs)
+        LauncherPerformanceEngine.refresh(prefs)
     }
 
     private fun hookTaskHeader(module: Main, loader: ClassLoader): Int {
@@ -720,16 +736,10 @@ object LauncherStabilityHook {
     }
     private fun readScrollerVelocity(host: Any): Float? {
         val scroller = readField(host, "mScroller") ?: return null
-        val method = scroller.javaClass.methods.firstOrNull {
-            it.name == "getCurrVelocity" &&
-                it.parameterTypes.isEmpty()
-        } ?: scroller.javaClass.declaredMethods.firstOrNull {
-            it.name == "getCurrVelocity" &&
-                it.parameterTypes.isEmpty()
-        } ?: return null
+        val method = findNoArgMethodCached(scroller.javaClass, "getCurrVelocity")
+            ?: return null
 
         return runCatching {
-            method.isAccessible = true
             (method.invoke(scroller) as? Number)?.toFloat()
         }.getOrNull()
     }
@@ -740,17 +750,50 @@ object LauncherStabilityHook {
     }
 
     private fun readField(host: Any, name: String): Any? {
-        var cls: Class<*>? = host.javaClass
+        val start = host.javaClass
+        val key = "${start.name}#$name"
+        if (missingFields.contains(key)) return null
+
+        val field = fieldCache[key] ?: run {
+            var cls: Class<*>? = start
+            var found: Field? = null
+            while (cls != null && found == null) {
+                found = cls.declaredFields.firstOrNull { it.name == name }
+                cls = cls.superclass
+            }
+            if (found == null) {
+                missingFields += key
+                return null
+            }
+            found.isAccessible = true
+            fieldCache[key] = found
+            found
+        }
+
+        return runCatching { field.get(host) }.getOrNull()
+    }
+
+    private fun findNoArgMethodCached(start: Class<*>, name: String): Method? {
+        val key = "${start.name}#$name()"
+        if (missingNoArgMethods.contains(key)) return null
+
+        val cached = noArgMethodCache[key]
+        if (cached != null) return cached
+
+        var cls: Class<*>? = start
         while (cls != null) {
-            val field = cls.declaredFields.firstOrNull { it.name == name }
-            if (field != null) {
-                return runCatching {
-                    field.isAccessible = true
-                    field.get(host)
-                }.getOrNull()
+            val method = cls.declaredMethods.firstOrNull {
+                it.name == name && it.parameterTypes.isEmpty()
+            }
+            if (method != null) {
+                method.isAccessible = true
+                noArgMethodCache[key] = method
+                return method
             }
             cls = cls.superclass
         }
+
+        missingNoArgMethods += key
         return null
     }
     private fun applyBubbleLabel(host: Any) {
