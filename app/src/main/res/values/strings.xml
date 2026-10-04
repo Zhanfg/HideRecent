@@ -35,7 +35,66 @@
     <string name="hide_task_icon_desc">仅控制任务头部图标，不改 Surface、Spring 或窗口矩阵。</string>
     <string name="hide_clear_button">隐藏清除按钮</string>
     <string name="hide_clear_button_desc">保留布局空间，仅隐藏清除面板显示，避免重排最近任务。</string>
-    <string name="launcher_risk_note">本版新增的桌面显示功能全部限制在 View 层：不改数据库、DeviceProfile、SurfaceControl 或 Spring。Window Tilt、LayerGeometry、Break/Unlock 等高风险动画仍继续隔离。</string>
+    <string name="extended_features_title">扩展功能</string>
+    <string name="extended_features_desc">参考 LuckyTool 与 OShin 的公开实现，并按系统桌面 17.3.12 实际类/方法重新适配。所有新增功能默认关闭；实验功能可能需要重启桌面进程。</string>
+
+    <string name="ext_stable_title">稳定扩展</string>
+    <string name="force_memory_info">强制显示最近任务内存信息</string>
+    <string name="force_memory_info_desc">若当前运行时提供 MemoryInfoManager，则强制允许内存信息与详情显示；类不存在时自动跳过。</string>
+    <string name="auto_close_folder">从文件夹启动应用后自动关闭文件夹</string>
+    <string name="auto_close_folder_desc">在官方 closeOpenViews 流程内补齐 TYPE_FOLDER 关闭，不修改文件夹数据库。</string>
+    <string name="remove_folder_preview_bg">移除文件夹预览背景</string>
+    <string name="remove_folder_preview_bg_desc">跳过 OplusPreviewBackground 的背景绘制；文件夹图标内容仍正常显示。</string>
+    <string name="remove_update_green_dot">隐藏应用更新绿点</string>
+    <string name="remove_update_green_dot_desc">关闭 BubbleTextView 的更新绿点判定，不影响通知圆点。</string>
+    <string name="hide_recents_dock">隐藏最近任务底部 Dock 图标</string>
+    <string name="hide_recents_dock_desc">让最近任务 DockView 进入隐藏状态，不修改任务卡片本体。</string>
+    <string name="disable_auto_focus_next_task">关闭后台自动聚焦下一任务</string>
+    <string name="disable_auto_focus_next_task_desc">关闭 AppFeatureUtils 的 Overview 自动跳下一卡逻辑，减少卡片关闭后自动偏移。</string>
+    <string name="enable_indicator_entry">启用桌面指示器菜单入口</string>
+    <string name="enable_indicator_entry_desc">强制开放 IndicatorEntry 的菜单能力；具体入口仍由系统桌面本身决定。</string>
+    <string name="unlimit_folder_name">移除文件夹名称输入限制</string>
+    <string name="unlimit_folder_name_desc">替换 OplusFolder 的名称 TextWatcher。此项会改变厂商输入限制，建议改完名称后关闭。</string>
+    <string name="disable_icon_secondary_menu">禁用图标长按二级快捷项</string>
+    <string name="disable_icon_secondary_menu_desc">抑制 PopupDataProvider 的附加快捷项计数，保留基础应用操作。</string>
+    <string name="allow_excluded_task_lock">允许锁定被排除的最近任务</string>
+    <string name="allow_excluded_task_lock_desc">仅在锁定判定期间临时移除 FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS，判定结束后恢复 Intent。</string>
+    <string name="unlock_task_lock_limit">解除最近任务锁定数量限制</string>
+    <string name="unlock_task_lock_limit_desc">对 isAppAllowLock / isAppAllowUnlock 放宽限制；默认关闭。</string>
+
+    <string name="ext_dock_title">Dock / 模糊</string>
+    <string name="enable_dock_background">强制启用 Dock 背景能力</string>
+    <string name="enable_dock_background_desc">开放 isSupportDockerExpandScreen，供系统桌面使用其原生 Dock 背景。</string>
+    <string name="force_dock_blur">强制启用新 Dock 模糊</string>
+    <string name="force_dock_blur_desc">开放 OplusBlurProperties 新模糊与大屏特性门控；属于中风险视觉功能。</string>
+    <string name="dock_alpha_enabled">自定义 Dock 背景透明度</string>
+    <string name="dock_alpha_enabled_desc">启用后覆盖 OplusHotseat.setBackgroundAlpha 的输入值。</string>
+    <string name="dock_alpha">Dock 背景不透明度</string>
+    <string name="blur_corner_enabled">自定义模糊圆角</string>
+    <string name="blur_corner_enabled_desc">启用后覆盖 OplusBlurProperties.setBlurCornerRadius 的圆角半径。</string>
+    <string name="blur_corner">模糊圆角半径</string>
+    <string name="dock_max_enabled">扩展 Dock 最大图标数量</string>
+    <string name="dock_max_enabled_desc">提高 ExpandConfig 返回的最大数量，不会降低系统原本允许的数量。</string>
+    <string name="dock_max_items">Dock 最大图标数</string>
+
+    <string name="ext_experimental_title">实验功能 · 默认关闭</string>
+    <string name="default_home_enabled">自定义默认主页</string>
+    <string name="default_home_enabled_desc">修改 Workspace.DEFAULT_PAGE。页码从 1 开始显示；越界时系统桌面仍可能自动纠正。</string>
+    <string name="default_home_page">默认主页</string>
+    <string name="folder_grid_enabled">自定义文件夹行列</string>
+    <string name="folder_grid_enabled_desc">修改当前 InvariantDeviceProfile 的文件夹行列并同步预览；部分变化可能需要重启桌面进程。</string>
+    <string name="folder_rows">文件夹行数</string>
+    <string name="folder_columns">文件夹列数</string>
+    <string name="drawer_grid_enabled">自定义抽屉列数</string>
+    <string name="drawer_grid_enabled_desc">修改 numAllAppsColumns；属于布局实验项，建议逐级调整。</string>
+    <string name="drawer_columns">抽屉列数</string>
+    <string name="force_fold_mode">模拟折叠屏桌面模式</string>
+    <string name="force_fold_mode_desc">覆盖 ScreenUtils 的折叠状态判断，会影响 Dock 和布局策略；仅用于实验。</string>
+    <string name="fold_mode">模拟状态</string>
+    <string name="fold_mode_expanded">展开态</string>
+    <string name="fold_mode_folded">折叠态</string>
+
+    <string name="launcher_risk_note">扩展功能均为独立运行时门控，默认关闭。Grid、Fold、Dock 模糊和默认主页属于实验项；Window Tilt、LayerGeometry、自定义 Spring、Cascade Recents 等直接改 Surface/动画矩阵的高风险功能仍未默认接入。</string>
     <string name="launcher_apply_note">触觉 profile 保存后立即同步到 Launcher；若桌面进程仍缓存旧模块代码，重启系统桌面进程。</string>
 
     <string name="search">搜索</string>
