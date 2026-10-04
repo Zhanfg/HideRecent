@@ -427,7 +427,10 @@ internal object LauncherExtendedFeatures {
                             Intent::class.java,
                             UserHandle::class.java
                         )
-                        method.invoke(clicked.context, intent, UserHandle.of(userId))
+                        val userHandle = UserHandle::class.java
+                            .getMethod("of", Int::class.javaPrimitiveType)
+                            .invoke(null, userId)
+                        method.invoke(clicked.context, intent, userHandle)
                     } else {
                         clicked.context.startActivity(intent)
                     }
