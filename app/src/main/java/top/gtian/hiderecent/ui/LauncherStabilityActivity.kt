@@ -82,6 +82,7 @@ class LauncherStabilityActivity : AppCompatActivity() {
         buildHapticProfiles(findViewById(R.id.hapticProfileContainer))
         buildHapticLab(findViewById(R.id.hapticLabContainer))
         buildExtendedFeatures(findViewById(R.id.extendedFeatureContainer))
+        buildPerformanceFeatures(findViewById(R.id.performanceFeatureContainer))
         buildAnimationFeatures(findViewById(R.id.animationFeatureContainer))
 
         findViewById<TextView>(R.id.statusText).text =
@@ -444,6 +445,66 @@ class LauncherStabilityActivity : AppCompatActivity() {
             ),
             0
         )
+    }
+
+    private fun buildPerformanceFeatures(container: LinearLayout) {
+        addSection(container, getString(R.string.perf_master_section))
+        addSwitch(
+            container,
+            getString(R.string.perf_engine_enabled),
+            LauncherStabilityPrefs.KEY_PERF_ENGINE_ENABLED,
+            getString(R.string.perf_engine_enabled_desc)
+        )
+
+        addSection(container, getString(R.string.perf_recents_section))
+        addSwitch(
+            container,
+            getString(R.string.perf_adaptive_recents),
+            LauncherStabilityPrefs.KEY_PERF_ADAPTIVE_RECENTS,
+            getString(R.string.perf_adaptive_recents_desc)
+        )
+        addFloatSlider(
+            container,
+            getString(R.string.perf_recents_settle_floor),
+            LauncherStabilityPrefs.KEY_PERF_RECENTS_SETTLE_FLOOR,
+            0.52f,
+            0.90f,
+            0.64f,
+            38
+        ) { String.format("%.2f×", it) }
+
+        addSwitch(
+            container,
+            getString(R.string.perf_decisive_fling),
+            LauncherStabilityPrefs.KEY_PERF_DECISIVE_FLING,
+            getString(R.string.perf_decisive_fling_desc)
+        )
+        addFloatSlider(
+            container,
+            getString(R.string.perf_fling_gain),
+            LauncherStabilityPrefs.KEY_PERF_FLING_GAIN,
+            1.00f,
+            1.35f,
+            1.10f,
+            35
+        ) { String.format("%.2f×", it) }
+
+        addSection(container, getString(R.string.perf_workspace_section))
+        addSwitch(
+            container,
+            getString(R.string.perf_workspace_drag_paging),
+            LauncherStabilityPrefs.KEY_PERF_WORKSPACE_DRAG_PAGING,
+            getString(R.string.perf_workspace_drag_paging_desc)
+        )
+        addFloatSlider(
+            container,
+            getString(R.string.perf_drag_page_multiplier),
+            LauncherStabilityPrefs.KEY_PERF_DRAG_PAGE_MULTIPLIER,
+            0.55f,
+            1.00f,
+            0.72f,
+            45
+        ) { String.format("%.2f×", it) }
     }
 
     private fun buildAnimationFeatures(container: LinearLayout) {
