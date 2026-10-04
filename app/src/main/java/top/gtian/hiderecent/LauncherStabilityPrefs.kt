@@ -30,6 +30,7 @@ object LauncherStabilityPrefs {
     const val KEY_UNLIMIT_FOLDER_NAME = "unlimit_folder_name"
     const val KEY_DISABLE_ICON_SECONDARY_MENU = "disable_icon_secondary_menu"
     const val KEY_ALLOW_EXCLUDED_TASK_LOCK = "allow_excluded_task_lock"
+    const val KEY_UNLOCK_TASK_LOCK_LIMIT = "unlock_task_lock_limit"
 
     // Tunables / experimental.
     const val KEY_DOCK_ALPHA_ENABLED = "dock_alpha_enabled"
@@ -70,6 +71,7 @@ object LauncherStabilityPrefs {
         KEY_UNLIMIT_FOLDER_NAME,
         KEY_DISABLE_ICON_SECONDARY_MENU,
         KEY_ALLOW_EXCLUDED_TASK_LOCK,
+        KEY_UNLOCK_TASK_LOCK_LIMIT,
 
         KEY_DOCK_ALPHA_ENABLED,
         KEY_BLUR_CORNER_ENABLED,
