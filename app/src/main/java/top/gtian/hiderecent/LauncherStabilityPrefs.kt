@@ -31,6 +31,9 @@ object LauncherStabilityPrefs {
     const val KEY_DISABLE_ICON_SECONDARY_MENU = "disable_icon_secondary_menu"
     const val KEY_ALLOW_EXCLUDED_TASK_LOCK = "allow_excluded_task_lock"
     const val KEY_UNLOCK_TASK_LOCK_LIMIT = "unlock_task_lock_limit"
+    const val KEY_REMOVE_SHORTCUT_BADGE = "remove_shortcut_badge"
+    const val KEY_REMOVE_WORK_BADGE = "remove_work_badge"
+    const val KEY_REMOVE_CLONE_BADGE = "remove_clone_badge"
 
     // Tunables / experimental.
     const val KEY_DOCK_ALPHA_ENABLED = "dock_alpha_enabled"
@@ -48,6 +51,8 @@ object LauncherStabilityPrefs {
     const val KEY_DRAWER_COLUMNS = "drawer_columns"
     const val KEY_FORCE_FOLD_MODE = "force_fold_mode"
     const val KEY_FOLD_MODE = "fold_mode"
+    const val KEY_CUSTOM_ICON_SIZE_ENABLED = "custom_icon_size_enabled"
+    const val KEY_ICON_SIZE_DP = "icon_size_dp"
 
     val BOOLEAN_KEYS = arrayOf(
         KEY_HAPTIC_EFFECTS,
@@ -72,6 +77,9 @@ object LauncherStabilityPrefs {
         KEY_DISABLE_ICON_SECONDARY_MENU,
         KEY_ALLOW_EXCLUDED_TASK_LOCK,
         KEY_UNLOCK_TASK_LOCK_LIMIT,
+        KEY_REMOVE_SHORTCUT_BADGE,
+        KEY_REMOVE_WORK_BADGE,
+        KEY_REMOVE_CLONE_BADGE,
 
         KEY_DOCK_ALPHA_ENABLED,
         KEY_BLUR_CORNER_ENABLED,
@@ -79,7 +87,8 @@ object LauncherStabilityPrefs {
         KEY_DEFAULT_HOME_ENABLED,
         KEY_FOLDER_GRID_ENABLED,
         KEY_DRAWER_GRID_ENABLED,
-        KEY_FORCE_FOLD_MODE
+        KEY_FORCE_FOLD_MODE,
+        KEY_CUSTOM_ICON_SIZE_ENABLED
     )
 
     val STRING_KEYS = arrayOf(
@@ -94,7 +103,8 @@ object LauncherStabilityPrefs {
         KEY_FOLDER_ROWS,
         KEY_FOLDER_COLUMNS,
         KEY_DRAWER_COLUMNS,
-        KEY_FOLD_MODE
+        KEY_FOLD_MODE,
+        KEY_ICON_SIZE_DP
     )
 
     val FLOAT_KEYS = arrayOf(
@@ -115,6 +125,7 @@ object LauncherStabilityPrefs {
         KEY_FOLDER_COLUMNS -> 3
         KEY_DRAWER_COLUMNS -> 4
         KEY_FOLD_MODE -> 0
+        KEY_ICON_SIZE_DP -> 56
         else -> 0
     }
 
