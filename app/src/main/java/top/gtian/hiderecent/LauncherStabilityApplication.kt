@@ -10,21 +10,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class LauncherStabilityApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        applyDynamicColorsIfAvailable()
         LauncherRemotePrefsSync.start(this)
-    }
-
-    private fun applyDynamicColorsIfAvailable() {
-        runCatching {
-            val cls = Class.forName("com.google.android.material.color.DynamicColors")
-            val method = cls.getMethod(
-                "applyToActivitiesIfAvailable",
-                Application::class.java
-            )
-            method.invoke(null, this)
-        }.onFailure {
-            Log.d(Main.TAG, "Material dynamic colors unavailable; using fallback palette")
-        }
     }
 }
 
