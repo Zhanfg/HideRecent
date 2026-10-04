@@ -217,6 +217,7 @@ internal object LauncherExtendedFeatures {
         count += hookUpdateGreenDot(module, loader)
         count += hookRecentsDock(module, loader)
         count += hookPinCapsuleGate(module, loader)
+        count += hookPinCapsuleDiagnostics(module, loader)
         count += hookRecentsAppInfo(module, loader)
         count += hookAutoFocus(module, loader)
         count += hookIndicatorEntry(module, loader)
@@ -491,6 +492,103 @@ internal object LauncherExtendedFeatures {
                     "capsule/supportGate/$index"
                 ) { chain ->
                     if (config.restorePinCapsule) true else chain.proceed()
+                }
+            }
+
+        return count
+    }
+
+    /**
+     * Read-only diagnostics for the stock ColorOS 17 PinTask/Capsule path.
+     *
+     * No result or argument is modified here. When the restore switch is enabled we only
+     * record which OEM stage was actually reached, so device validation can distinguish:
+     * feature gate -> per-task support -> current pin state -> pin/unpin dispatch.
+     */
+    private fun hookPinCapsuleDiagnostics(module: Main, loader: ClassLoader): Int {
+        val cls = loadClass(loader, "com.android.launcher3.capsule.CapsuleManager")
+            ?: return 0
+        var count = 0
+
+        cls.declaredMethods
+            .filter {
+                it.name in setOf("isTaskSupportPin", "isTaskPinInCapsule")
+            }
+            .forEachIndexed { index, method ->
+                count += hook(
+                    module,
+                    method,
+                    "capsule/diag/${method.name}/$index"
+                ) { chain ->
+                    val result = chain.proceed()
+                    if (config.restorePinCapsule) {
+                        val argSummary = chain.args.joinToString(
+                            prefix = "[",
+                            postfix = "]"
+                        ) { arg ->
+                            when (arg) {
+                                null -> "null"
+                                is Number, is Boolean, is String -> arg.toString()
+                                else -> arg.javaClass.simpleName
+                            }
+                        }
+                        module.log(
+                            Log.INFO,
+                            TAG,
+                            "PinTask diag ${method.name} args=$argSummary result=$result"
+                        )
+                    }
+                    result
+                }
+            }
+
+        cls.declaredMethods
+            .filter {
+                it.name in setOf("pinToCapsule", "unpinCapsule")
+            }
+            .forEachIndexed { index, method ->
+                count += hook(
+                    module,
+                    method,
+                    "capsule/dispatch/${method.name}/$index"
+                ) { chain ->
+                    if (!config.restorePinCapsule) {
+                        return@hook chain.proceed()
+                    }
+
+                    val args = chain.args.joinToString(
+                        prefix = "[",
+                        postfix = "]"
+                    ) { arg ->
+                        when (arg) {
+                            null -> "null"
+                            is Number, is Boolean, is String -> arg.toString()
+                            else -> arg.javaClass.simpleName
+                        }
+                    }
+
+                    module.log(
+                        Log.INFO,
+                        TAG,
+                        "PinTask dispatch begin ${method.name} args=$args"
+                    )
+                    try {
+                        val result = chain.proceed()
+                        module.log(
+                            Log.INFO,
+                            TAG,
+                            "PinTask dispatch end ${method.name} result=$result"
+                        )
+                        result
+                    } catch (t: Throwable) {
+                        module.log(
+                            Log.ERROR,
+                            TAG,
+                            "PinTask dispatch failed ${method.name}",
+                            t
+                        )
+                        throw t
+                    }
                 }
             }
 
