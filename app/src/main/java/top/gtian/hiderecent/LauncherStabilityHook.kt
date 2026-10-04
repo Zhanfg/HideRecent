@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import android.os.Handler
 import android.os.SystemClock
 import android.os.Looper
-import android.os.UserManager
 import android.util.Log
 import android.view.View
 import android.widget.TextView
@@ -29,10 +28,10 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 object LauncherStabilityHook {
     private const val TAG = "${Main.TAG}/stability"
-    private const val BOOT_MIN_UPTIME_MS = 15_000L
-    private const val APP_READY_GRACE_MS = 1_500L
+    private const val BOOT_MIN_UPTIME_MS = 3_000L
+    private const val APP_READY_GRACE_MS = 500L
     private const val PREF_RETRY_MS = 1_500L
-    private const val PREF_MAX_ATTEMPTS = 8
+    private const val PREF_MAX_ATTEMPTS = 40
 
     private val bootstrapStarted = AtomicBoolean(false)
     private val hooksInstalled = AtomicBoolean(false)
@@ -142,20 +141,9 @@ object LauncherStabilityHook {
             val remaining = BOOT_MIN_UPTIME_MS - SystemClock.elapsedRealtime()
             if (remaining > 0L) SystemClock.sleep(remaining)
 
-            // Prefer waiting for user unlock, but do not make hook registration depend on it.
-            val unlockDeadline = SystemClock.elapsedRealtime() + 30_000L
-            while (generation == bootstrapGeneration.get() &&
-                SystemClock.elapsedRealtime() < unlockDeadline
-            ) {
-                val context = module.currentContext()
-                if (context != null) {
-                    val userManager = context.getSystemService(UserManager::class.java)
-                    if (userManager == null || userManager.isUserUnlocked) break
-                }
-                SystemClock.sleep(250L)
-            }
-            if (generation != bootstrapGeneration.get()) return
-
+            // RemotePreferences lives in the Xposed framework, so do not gate it on
+            // Launcher Application availability or user-unlock state. Keep the IPC off-main
+            // and simply retry while the framework finishes booting.
             SystemClock.sleep(APP_READY_GRACE_MS)
             if (generation != bootstrapGeneration.get()) return
 
