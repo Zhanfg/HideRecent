@@ -1,35 +1,47 @@
 package top.gtian.hiderecent.ui
 
 import android.content.SharedPreferences
+import android.content.res.Configuration
+import android.graphics.Color
 import android.os.Bundle
+import android.text.InputType
 import android.view.View
 import android.widget.ArrayAdapter
-import android.widget.Button
 import android.widget.LinearLayout
-import android.widget.SeekBar
-import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
-import androidx.appcompat.widget.Toolbar
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import com.google.android.material.R as MaterialR
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.color.MaterialColors
+import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.slider.Slider
+import com.google.android.material.textfield.MaterialAutoCompleteTextView
+import com.google.android.material.textfield.TextInputLayout
 import top.gtian.hiderecent.LauncherHapticProfile
 import top.gtian.hiderecent.LauncherStabilityPrefs
 import top.gtian.hiderecent.R
+import kotlin.math.round
 
 class LauncherStabilityActivity : AppCompatActivity() {
     private lateinit var prefs: SharedPreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.activity_launcher_stability)
 
-        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        configureSystemBars()
+
+        val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
         supportActionBar?.title = getString(R.string.app_name)
-        applyStatusBarSpacer()
+        applyInsets()
 
         prefs = getSharedPreferences(LauncherStabilityPrefs.PREFS_NAME, MODE_PRIVATE)
 
@@ -69,9 +81,20 @@ class LauncherStabilityActivity : AppCompatActivity() {
         buildHapticProfiles(findViewById(R.id.hapticProfileContainer))
         buildHapticLab(findViewById(R.id.hapticLabContainer))
         buildExtendedFeatures(findViewById(R.id.extendedFeatureContainer))
+        buildAnimationFeatures(findViewById(R.id.animationFeatureContainer))
 
         findViewById<TextView>(R.id.statusText).text =
             getString(R.string.launcher_apply_note)
+    }
+
+    private fun configureSystemBars() {
+        val isNight =
+            resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+                Configuration.UI_MODE_NIGHT_YES
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !isNight
+            isAppearanceLightNavigationBars = !isNight
+        }
     }
 
     private fun bind(view: SwitchCompat, key: String) {
@@ -82,19 +105,19 @@ class LauncherStabilityActivity : AppCompatActivity() {
     }
 
     private fun buildHapticProfiles(container: LinearLayout) {
-        addProfileSpinner(
+        addProfileDropdown(
             container,
             getString(R.string.haptic_profile_dismiss),
             LauncherStabilityPrefs.KEY_DISMISS_HAPTIC_PROFILE,
             LauncherHapticProfile.OEM_CLEAR_ALL
         )
-        addProfileSpinner(
+        addProfileDropdown(
             container,
             getString(R.string.haptic_profile_clear_all),
             LauncherStabilityPrefs.KEY_CLEAR_ALL_HAPTIC_PROFILE,
             LauncherHapticProfile.OEM_CLEAR_ALL
         )
-        addProfileSpinner(
+        addProfileDropdown(
             container,
             getString(R.string.haptic_profile_recents_enter),
             LauncherStabilityPrefs.KEY_RECENTS_ENTER_HAPTIC_PROFILE,
@@ -102,52 +125,71 @@ class LauncherStabilityActivity : AppCompatActivity() {
         )
     }
 
-    private fun addProfileSpinner(
+    private fun addProfileDropdown(
         container: LinearLayout,
         label: String,
         key: String,
         defaultProfile: LauncherHapticProfile
     ) {
-        val labelView = TextView(this).apply {
-            text = label
-            textSize = 14f
-            setPadding(0, dp(12), 0, dp(4))
-        }
-        container.addView(labelView)
-
         val profiles = LauncherHapticProfile.entries
-        val spinner = Spinner(this)
-        val adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_item,
-            profiles.map { it.title }
-        ).also {
-            it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
-        spinner.adapter = adapter
-
         val selected = LauncherHapticProfile.fromPref(
             prefs.getString(key, defaultProfile.prefValue)
         )
-        spinner.setSelection(profiles.indexOf(selected).coerceAtLeast(0), false)
-        spinner.onItemSelectedListener = SimpleItemSelectedListener { position ->
-            val profile = profiles[position]
-            prefs.edit().putString(key, profile.prefValue).apply()
+
+        val field = TextInputLayout(
+            this,
+            null,
+            MaterialR.attr.textInputOutlinedExposedDropdownMenuStyle
+        ).apply {
+            hint = label
+            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+            endIconMode = TextInputLayout.END_ICON_DROPDOWN_MENU
         }
-        container.addView(
-            spinner,
+
+        val dropdown = MaterialAutoCompleteTextView(this).apply {
+            inputType = InputType.TYPE_NULL
+            setAdapter(
+                ArrayAdapter(
+                    this@LauncherStabilityActivity,
+                    android.R.layout.simple_dropdown_item_1line,
+                    profiles.map { it.title }
+                )
+            )
+            setText(selected.title, false)
+            setOnItemClickListener { _, _, position, _ ->
+                prefs.edit()
+                    .putString(key, profiles[position].prefValue)
+                    .apply()
+            }
+            setOnClickListener { showDropDown() }
+        }
+
+        field.addView(
+            dropdown,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         )
+        container.addView(
+            field,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(10) }
+        )
     }
 
     private fun buildHapticLab(container: LinearLayout) {
         LauncherHapticProfile.previewable.forEach { profile ->
-            val button = Button(this).apply {
+            val button = MaterialButton(
+                this,
+                null,
+                MaterialR.attr.materialButtonOutlinedStyle
+            ).apply {
                 text = profile.title
                 isAllCaps = false
+                cornerRadius = dp(18)
                 setOnClickListener {
                     val ok = profile.vibrate(this@LauncherStabilityActivity)
                     if (!ok) {
@@ -159,16 +201,15 @@ class LauncherStabilityActivity : AppCompatActivity() {
                     }
                 }
             }
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(48)
-            ).apply {
-                topMargin = dp(6)
-            }
-            container.addView(button, params)
+            container.addView(
+                button,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(50)
+                ).apply { topMargin = dp(7) }
+            )
         }
     }
-
 
     private fun buildExtendedFeatures(container: LinearLayout) {
         addSection(container, getString(R.string.ext_stable_title))
@@ -202,12 +243,6 @@ class LauncherStabilityActivity : AppCompatActivity() {
             getString(R.string.hide_recents_dock),
             LauncherStabilityPrefs.KEY_HIDE_RECENTS_DOCK,
             getString(R.string.hide_recents_dock_desc)
-        )
-        addSwitch(
-            container,
-            getString(R.string.recents_long_press_app_info),
-            LauncherStabilityPrefs.KEY_RECENTS_LONG_PRESS_APP_INFO,
-            getString(R.string.recents_long_press_app_info_desc)
         )
         addSwitch(
             container,
@@ -260,9 +295,8 @@ class LauncherStabilityActivity : AppCompatActivity() {
             LauncherStabilityPrefs.KEY_ICON_SIZE_DP,
             36,
             96,
-            56,
-            { value -> "$value dp" }
-        )
+            56
+        ) { "$it dp" }
         addSwitch(
             container,
             getString(R.string.remove_shortcut_badge),
@@ -309,9 +343,8 @@ class LauncherStabilityActivity : AppCompatActivity() {
             0f,
             1f,
             1f,
-            100,
-            { value -> "${(value * 100).toInt()}%" }
-        )
+            100
+        ) { "${(it * 100).roundToInt()}%" }
         addSwitch(
             container,
             getString(R.string.blur_corner_enabled),
@@ -325,9 +358,8 @@ class LauncherStabilityActivity : AppCompatActivity() {
             0f,
             100f,
             28f,
-            100,
-            { value -> String.format("%.0f dp", value) }
-        )
+            100
+        ) { String.format("%.0f dp", it) }
         addSwitch(
             container,
             getString(R.string.dock_max_enabled),
@@ -340,9 +372,8 @@ class LauncherStabilityActivity : AppCompatActivity() {
             LauncherStabilityPrefs.KEY_DOCK_MAX_ITEMS,
             5,
             20,
-            8,
-            { value -> value.toString() }
-        )
+            8
+        ) { it.toString() }
 
         addSection(container, getString(R.string.ext_experimental_title))
 
@@ -358,9 +389,8 @@ class LauncherStabilityActivity : AppCompatActivity() {
             LauncherStabilityPrefs.KEY_DEFAULT_HOME_PAGE,
             0,
             19,
-            0,
-            { value -> (value + 1).toString() }
-        )
+            0
+        ) { (it + 1).toString() }
         addSwitch(
             container,
             getString(R.string.folder_grid_enabled),
@@ -373,18 +403,16 @@ class LauncherStabilityActivity : AppCompatActivity() {
             LauncherStabilityPrefs.KEY_FOLDER_ROWS,
             2,
             8,
-            4,
-            { value -> value.toString() }
-        )
+            4
+        ) { it.toString() }
         addIntSlider(
             container,
             getString(R.string.folder_columns),
             LauncherStabilityPrefs.KEY_FOLDER_COLUMNS,
             2,
             8,
-            3,
-            { value -> value.toString() }
-        )
+            3
+        ) { it.toString() }
         addSwitch(
             container,
             getString(R.string.drawer_grid_enabled),
@@ -397,16 +425,15 @@ class LauncherStabilityActivity : AppCompatActivity() {
             LauncherStabilityPrefs.KEY_DRAWER_COLUMNS,
             3,
             10,
-            4,
-            { value -> value.toString() }
-        )
+            4
+        ) { it.toString() }
         addSwitch(
             container,
             getString(R.string.force_fold_mode),
             LauncherStabilityPrefs.KEY_FORCE_FOLD_MODE,
             getString(R.string.force_fold_mode_desc)
         )
-        addIntSpinner(
+        addIntDropdown(
             container,
             getString(R.string.fold_mode),
             LauncherStabilityPrefs.KEY_FOLD_MODE,
@@ -418,12 +445,185 @@ class LauncherStabilityActivity : AppCompatActivity() {
         )
     }
 
+    private fun buildAnimationFeatures(container: LinearLayout) {
+        addSection(container, getString(R.string.anim_master_section))
+        addSwitch(
+            container,
+            getString(R.string.anim_engine_enabled),
+            LauncherStabilityPrefs.KEY_ANIM_ENGINE_ENABLED,
+            getString(R.string.anim_engine_enabled_desc)
+        )
+
+        addSection(container, getString(R.string.anim_app_section))
+        addSwitch(
+            container,
+            getString(R.string.anim_icon_pulse),
+            LauncherStabilityPrefs.KEY_ANIM_ICON_PULSE,
+            getString(R.string.anim_icon_pulse_desc)
+        )
+        addFloatSlider(
+            container,
+            getString(R.string.anim_icon_pulse_scale),
+            LauncherStabilityPrefs.KEY_ANIM_ICON_PULSE_SCALE,
+            0.88f,
+            1f,
+            0.94f,
+            12
+        ) { String.format("%.2f×", it) }
+
+        addSwitch(
+            container,
+            getString(R.string.anim_icon_tilt),
+            LauncherStabilityPrefs.KEY_ANIM_ICON_TILT,
+            getString(R.string.anim_icon_tilt_desc)
+        )
+        addFloatSlider(
+            container,
+            getString(R.string.anim_icon_tilt_deg),
+            LauncherStabilityPrefs.KEY_ANIM_ICON_TILT_DEG,
+            0f,
+            12f,
+            4f,
+            24
+        ) { String.format("%.1f°", it) }
+
+        addSwitch(
+            container,
+            getString(R.string.anim_transition_timing),
+            LauncherStabilityPrefs.KEY_ANIM_TRANSITION_TIMING,
+            getString(R.string.anim_transition_timing_desc)
+        )
+        addFloatSlider(
+            container,
+            getString(R.string.anim_transition_multiplier),
+            LauncherStabilityPrefs.KEY_ANIM_TRANSITION_MULTIPLIER,
+            0.70f,
+            1.35f,
+            1f,
+            65
+        ) { String.format("%.2f×", it) }
+
+        addSection(container, getString(R.string.anim_recents_section))
+
+        addSwitch(
+            container,
+            getString(R.string.anim_recents_tilt),
+            LauncherStabilityPrefs.KEY_ANIM_RECENTS_TILT,
+            getString(R.string.anim_recents_tilt_desc)
+        )
+        addFloatSlider(
+            container,
+            getString(R.string.anim_recents_tilt_deg),
+            LauncherStabilityPrefs.KEY_ANIM_RECENTS_TILT_DEG,
+            0f,
+            16f,
+            6f,
+            32
+        ) { String.format("%.1f°", it) }
+
+        addSwitch(
+            container,
+            getString(R.string.anim_running_scale),
+            LauncherStabilityPrefs.KEY_ANIM_RUNNING_SCALE,
+            getString(R.string.anim_running_scale_desc)
+        )
+        addFloatSlider(
+            container,
+            getString(R.string.anim_running_scale_value),
+            LauncherStabilityPrefs.KEY_ANIM_RUNNING_SCALE_VALUE,
+            0.90f,
+            1.06f,
+            1f,
+            16
+        ) { String.format("%.2f×", it) }
+
+        addSwitch(
+            container,
+            getString(R.string.anim_snap_tuning),
+            LauncherStabilityPrefs.KEY_ANIM_SNAP_TUNING,
+            getString(R.string.anim_snap_tuning_desc)
+        )
+        addFloatSlider(
+            container,
+            getString(R.string.anim_snap_multiplier),
+            LauncherStabilityPrefs.KEY_ANIM_SNAP_MULTIPLIER,
+            0.65f,
+            1.45f,
+            1f,
+            80
+        ) { String.format("%.2f×", it) }
+
+        addSwitch(
+            container,
+            getString(R.string.anim_overscroll_tuning),
+            LauncherStabilityPrefs.KEY_ANIM_OVERSCROLL_TUNING,
+            getString(R.string.anim_overscroll_tuning_desc)
+        )
+        addFloatSlider(
+            container,
+            getString(R.string.anim_overscroll_multiplier),
+            LauncherStabilityPrefs.KEY_ANIM_OVERSCROLL_MULTIPLIER,
+            0.55f,
+            1.45f,
+            1f,
+            90
+        ) { String.format("%.2f×", it) }
+
+        addSwitch(
+            container,
+            getString(R.string.anim_fling_tuning),
+            LauncherStabilityPrefs.KEY_ANIM_FLING_TUNING,
+            getString(R.string.anim_fling_tuning_desc)
+        )
+        addFloatSlider(
+            container,
+            getString(R.string.anim_fling_multiplier),
+            LauncherStabilityPrefs.KEY_ANIM_FLING_MULTIPLIER,
+            0.65f,
+            1.50f,
+            1f,
+            85
+        ) { String.format("%.2f×", it) }
+
+        addSwitch(
+            container,
+            getString(R.string.anim_spring_tuning),
+            LauncherStabilityPrefs.KEY_ANIM_SPRING_TUNING,
+            getString(R.string.anim_spring_tuning_desc)
+        )
+        addFloatSlider(
+            container,
+            getString(R.string.anim_spring_stiffness),
+            LauncherStabilityPrefs.KEY_ANIM_SPRING_STIFFNESS,
+            0.65f,
+            1.35f,
+            1f,
+            70
+        ) { String.format("%.2f×", it) }
+        addFloatSlider(
+            container,
+            getString(R.string.anim_spring_damping),
+            LauncherStabilityPrefs.KEY_ANIM_SPRING_DAMPING,
+            0.75f,
+            1.25f,
+            1f,
+            50
+        ) { String.format("%.2f×", it) }
+    }
+
     private fun addSection(container: LinearLayout, title: String) {
         container.addView(
             TextView(this).apply {
                 text = title
-                textSize = 15f
-                setPadding(0, dp(20), 0, dp(4))
+                textSize = 14f
+                setTextColor(
+                    MaterialColors.getColor(
+                        this,
+                        MaterialR.attr.colorPrimary,
+                        Color.DKGRAY
+                    )
+                )
+                setPadding(0, dp(22), 0, dp(4))
             }
         )
     }
@@ -434,9 +634,9 @@ class LauncherStabilityActivity : AppCompatActivity() {
         key: String,
         summary: String
     ) {
-        val switch = SwitchCompat(this).apply {
+        val switch = MaterialSwitch(this).apply {
             text = title
-            minHeight = dp(52)
+            minHeight = dp(56)
             isChecked = prefs.getBoolean(key, false)
             setOnCheckedChangeListener { _, checked ->
                 prefs.edit().putBoolean(key, checked).apply()
@@ -447,13 +647,20 @@ class LauncherStabilityActivity : AppCompatActivity() {
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(8) }
+            ).apply { topMargin = dp(6) }
         )
 
         container.addView(
             TextView(this).apply {
                 text = summary
                 textSize = 12.5f
+                setTextColor(
+                    MaterialColors.getColor(
+                        this,
+                        MaterialR.attr.colorOnSurfaceVariant,
+                        Color.GRAY
+                    )
+                )
                 setPadding(dp(4), 0, dp(4), dp(2))
             }
         )
@@ -468,31 +675,27 @@ class LauncherStabilityActivity : AppCompatActivity() {
         defaultValue: Int,
         formatter: (Int) -> String
     ) {
-        val label = TextView(this).apply {
-            textSize = 13.5f
-            setPadding(0, dp(10), 0, 0)
-        }
         val current = prefs.getInt(key, defaultValue).coerceIn(min, max)
-        label.text = "$title · ${formatter(current)}"
+        val label = sliderLabel("$title · ${formatter(current)}")
         container.addView(label)
 
-        val seekBar = SeekBar(this).apply {
-            this.max = max - min
-            progress = current - min
+        val slider = Slider(this).apply {
+            valueFrom = min.toFloat()
+            valueTo = max.toFloat()
+            stepSize = 1f
+            value = current.toFloat()
         }
-        seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(bar: SeekBar?, progress: Int, fromUser: Boolean) {
-                label.text = "$title · ${formatter(min + progress)}"
-            }
+        slider.addOnChangeListener { _, value, _ ->
+            label.text = "$title · ${formatter(value.roundToInt())}"
+        }
+        slider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) = Unit
 
-            override fun onStartTrackingTouch(bar: SeekBar?) = Unit
-
-            override fun onStopTrackingTouch(bar: SeekBar?) {
-                val value = min + (bar?.progress ?: 0)
-                prefs.edit().putInt(key, value).apply()
+            override fun onStopTrackingTouch(slider: Slider) {
+                prefs.edit().putInt(key, slider.value.roundToInt()).apply()
             }
         })
-        container.addView(seekBar)
+        container.addView(slider)
     }
 
     private fun addFloatSlider(
@@ -505,98 +708,131 @@ class LauncherStabilityActivity : AppCompatActivity() {
         steps: Int,
         formatter: (Float) -> String
     ) {
-        val label = TextView(this).apply {
-            textSize = 13.5f
-            setPadding(0, dp(10), 0, 0)
-        }
-        val current = prefs.getFloat(key, defaultValue).coerceIn(min, max)
-        fun progressToValue(progress: Int): Float =
-            min + (max - min) * progress.toFloat() / steps.toFloat()
-        fun valueToProgress(value: Float): Int =
-            (((value - min) / (max - min)) * steps).toInt().coerceIn(0, steps)
+        val step = (max - min) / steps.toFloat()
+        val raw = prefs.getFloat(key, defaultValue).coerceIn(min, max)
+        val aligned = (
+            min + round((raw - min) / step) * step
+        ).coerceIn(min, max)
 
-        label.text = "$title · ${formatter(current)}"
+        val label = sliderLabel("$title · ${formatter(aligned)}")
         container.addView(label)
 
-        val seekBar = SeekBar(this).apply {
-            this.max = steps
-            progress = valueToProgress(current)
+        val slider = Slider(this).apply {
+            valueFrom = min
+            valueTo = max
+            stepSize = step
+            value = aligned
         }
-        seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(bar: SeekBar?, progress: Int, fromUser: Boolean) {
-                label.text = "$title · ${formatter(progressToValue(progress))}"
-            }
+        slider.addOnChangeListener { _, value, _ ->
+            label.text = "$title · ${formatter(value)}"
+        }
+        slider.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) = Unit
 
-            override fun onStartTrackingTouch(bar: SeekBar?) = Unit
-
-            override fun onStopTrackingTouch(bar: SeekBar?) {
-                val value = progressToValue(bar?.progress ?: 0)
-                prefs.edit().putFloat(key, value).apply()
+            override fun onStopTrackingTouch(slider: Slider) {
+                prefs.edit().putFloat(key, slider.value).apply()
             }
         })
-        container.addView(seekBar)
+        container.addView(slider)
     }
 
-    private fun addIntSpinner(
+    private fun sliderLabel(textValue: String): TextView =
+        TextView(this).apply {
+            text = textValue
+            textSize = 13.5f
+            setTextColor(
+                MaterialColors.getColor(
+                    this,
+                    MaterialR.attr.colorOnSurface,
+                    Color.DKGRAY
+                )
+            )
+            setPadding(0, dp(12), 0, 0)
+        }
+
+    private fun addIntDropdown(
         container: LinearLayout,
         title: String,
         key: String,
         options: List<Pair<Int, String>>,
         defaultValue: Int
     ) {
-        container.addView(
-            TextView(this).apply {
-                text = title
-                textSize = 13.5f
-                setPadding(0, dp(10), 0, dp(3))
-            }
-        )
-
-        val spinner = Spinner(this)
-        spinner.adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_item,
-            options.map { it.second }
-        ).also {
-            it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
         val current = prefs.getInt(key, defaultValue)
-        spinner.setSelection(options.indexOfFirst { it.first == current }.coerceAtLeast(0), false)
-        spinner.onItemSelectedListener = SimpleItemSelectedListener { position ->
-            prefs.edit().putInt(key, options[position].first).apply()
+        val selectedIndex =
+            options.indexOfFirst { it.first == current }.coerceAtLeast(0)
+
+        val field = TextInputLayout(
+            this,
+            null,
+            MaterialR.attr.textInputOutlinedExposedDropdownMenuStyle
+        ).apply {
+            hint = title
+            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+            endIconMode = TextInputLayout.END_ICON_DROPDOWN_MENU
         }
-        container.addView(spinner)
+
+        val dropdown = MaterialAutoCompleteTextView(this).apply {
+            inputType = InputType.TYPE_NULL
+            setAdapter(
+                ArrayAdapter(
+                    this@LauncherStabilityActivity,
+                    android.R.layout.simple_dropdown_item_1line,
+                    options.map { it.second }
+                )
+            )
+            setText(options[selectedIndex].second, false)
+            setOnItemClickListener { _, _, position, _ ->
+                prefs.edit().putInt(key, options[position].first).apply()
+            }
+            setOnClickListener { showDropDown() }
+        }
+
+        field.addView(
+            dropdown,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+        container.addView(
+            field,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(12) }
+        )
     }
 
-    private fun applyStatusBarSpacer() {
+    private fun applyInsets() {
         val spacer: View = findViewById(R.id.statusBarSpacer)
-        val lp = spacer.layoutParams
+        val content: View = findViewById(R.id.contentRoot)
+        val spacerLp = spacer.layoutParams
+        val baseBottom = dp(32)
+
         ViewCompat.setOnApplyWindowInsetsListener(spacer) { v, insets ->
             val top = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
-            if (lp.height != top) {
-                lp.height = top
-                v.layoutParams = lp
+            if (spacerLp.height != top) {
+                spacerLp.height = top
+                v.layoutParams = spacerLp
             }
             insets
         }
+
+        ViewCompat.setOnApplyWindowInsetsListener(content) { v, insets ->
+            val bottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            v.setPadding(
+                v.paddingLeft,
+                v.paddingTop,
+                v.paddingRight,
+                baseBottom + bottom
+            )
+            insets
+        }
+
         ViewCompat.requestApplyInsets(spacer)
+        ViewCompat.requestApplyInsets(content)
     }
 
     private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
-
-    private class SimpleItemSelectedListener(
-        private val onSelected: (Int) -> Unit
-    ) : android.widget.AdapterView.OnItemSelectedListener {
-        override fun onItemSelected(
-            parent: android.widget.AdapterView<*>?,
-            view: View?,
-            position: Int,
-            id: Long
-        ) {
-            onSelected(position)
-        }
-
-        override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
-    }
+        (value * resources.displayMetrics.density).roundToInt()
 }
