@@ -32,8 +32,12 @@ class Main : XposedModule() {
         const val EXTRA_HIDE = "hide_list"
         const val PREFS_PERMISSION = "cc.axymorrsen.launcherstability.permission.PREFS"
 
+        const val LAUNCHER_PKG = "com.android.launcher"
+        const val SMART_SIDEBAR_PKG = "com.coloros.smartsidebar"
+        const val FLEXIBLE_WINDOW_UI_PKG = "com.oplus.pscanvas"
+
         val DEFAULT_RECENTS_HOST_PKGS = setOf(
-            "com.android.launcher"
+            LAUNCHER_PKG
         )
 
         fun notifyPrefsChanged(ctx: Context, hidden: Set<String>) {
@@ -74,18 +78,36 @@ class Main : XposedModule() {
 
     override fun onPackageLoaded(param: PackageLoadedParam) {
         if (!param.isFirstPackage || param.packageName == MODULE_PKG) return
-        if (param.packageName !in DEFAULT_RECENTS_HOST_PKGS) return
 
-        runCatching {
-            LauncherStabilityHook.hook(this, param.defaultClassLoader)
-        }.onFailure {
-            log(Log.ERROR, TAG, "launcher stability hook failed", it)
+        when (param.packageName) {
+            LAUNCHER_PKG -> runCatching {
+                LauncherStabilityHook.hook(this, param.defaultClassLoader)
+            }.onFailure {
+                log(Log.ERROR, TAG, "launcher stability hook failed", it)
+            }
+
+            SMART_SIDEBAR_PKG,
+            FLEXIBLE_WINDOW_UI_PKG -> runCatching {
+                FlexibleWindowBridge.hook(
+                    this,
+                    param.packageName,
+                    param.defaultClassLoader
+                )
+            }.onFailure {
+                log(
+                    Log.ERROR,
+                    TAG,
+                    "flexible-window bridge failed for " + param.packageName,
+                    it
+                )
+            }
         }
     }
 
     override fun onHotReloading(param: HotReloadingParam): Boolean {
         param.setSavedInstanceState("")
         LauncherStabilityHook.prepareHotReload()
+        FlexibleWindowBridge.prepareHotReload()
         return true
     }
 
@@ -98,14 +120,29 @@ class Main : XposedModule() {
         oldHandles.forEach { runCatching { it.unhook() } }
 
         val processPackage = param.processName.substringBefore(':')
-        if (!param.isSystemServer &&
-            processPackage in DEFAULT_RECENTS_HOST_PKGS &&
-            loader != null
-        ) {
-            runCatching {
+        if (param.isSystemServer || loader == null) return
+
+        when (processPackage) {
+            LAUNCHER_PKG -> runCatching {
                 LauncherStabilityHook.hook(this, loader)
             }.onFailure {
-                log(Log.ERROR, TAG, "hot reload rehook failed", it)
+                log(Log.ERROR, TAG, "hot reload launcher rehook failed", it)
+            }
+
+            SMART_SIDEBAR_PKG,
+            FLEXIBLE_WINDOW_UI_PKG -> runCatching {
+                FlexibleWindowBridge.hook(
+                    this,
+                    processPackage,
+                    loader
+                )
+            }.onFailure {
+                log(
+                    Log.ERROR,
+                    TAG,
+                    "hot reload flexible-window rehook failed",
+                    it
+                )
             }
         }
     }
