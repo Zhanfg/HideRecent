@@ -47,12 +47,12 @@ jobs:
       - name: Rename APK
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/debug/app-debug.apk             out/LauncherStability-17.3.12-stability-0.9.0.apk
+          cp app/build/outputs/apk/debug/app-debug.apk             out/LauncherStability-17.3.12-stability-0.9.0-hotfix1.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LauncherStability-17.3.12-stability-0.9.0
-          path: out/LauncherStability-17.3.12-stability-0.9.0.apk
+          name: LauncherStability-17.3.12-stability-0.9.0-hotfix1
+          path: out/LauncherStability-17.3.12-stability-0.9.0-hotfix1.apk
           if-no-files-found: error
           retention-days: 14
