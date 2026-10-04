@@ -84,33 +84,70 @@ object LauncherStabilityHook {
     )
 
     /**
-     * Cold-boot invariant: never perform Binder/config I/O or hook registration on
-     * PackageLoaded's critical thread. Launcher/Quickstep must reach stock-ready state first.
+     * Two independent boot lanes:
+     *
+     * 1. Hook lane: install the hook skeleton as soon as Launcher main queue first becomes idle.
+     *    Config defaults are all false, so every callback is a pure pass-through until prefs arrive.
+     *
+     * 2. Config lane: obtain RemotePreferences later on a low-priority worker after user unlock.
+     *    Binder/config failure must never suppress hook registration.
      */
     fun hook(module: Main, loader: ClassLoader) {
         if (!bootstrapStarted.compareAndSet(false, true)) return
         val generation = bootstrapGeneration.incrementAndGet()
 
+        scheduleHookSkeleton(module, loader, generation)
+
         Thread({
-            bootSafeBootstrap(module, loader, generation)
-        }, "LauncherStabilityInit").apply {
+            bootstrapConfig(module, generation)
+        }, "LauncherStabilityConfig").apply {
             isDaemon = true
             priority = Thread.NORM_PRIORITY - 1
             start()
         }
     }
 
-    private fun bootSafeBootstrap(module: Main, loader: ClassLoader, generation: Int) {
+    private fun scheduleHookSkeleton(
+        module: Main,
+        loader: ClassLoader,
+        generation: Int
+    ) {
+        mainHandler.post {
+            if (generation != bootstrapGeneration.get()) return@post
+            Looper.myQueue().addIdleHandler {
+                if (generation == bootstrapGeneration.get() &&
+                    hooksInstalled.compareAndSet(false, true)
+                ) {
+                    runCatching {
+                        installHooks(module, loader)
+                    }.onFailure {
+                        hooksInstalled.set(false)
+                        module.log(
+                            Log.ERROR,
+                            TAG,
+                            "hook skeleton install failed; Launcher remains stock",
+                            it
+                        )
+                    }
+                }
+                false
+            }
+        }
+    }
+
+    private fun bootstrapConfig(module: Main, generation: Int) {
         try {
-            // Do not touch Launcher during the first seconds of Android boot.
+            // RemotePreferences performs synchronous Binder work internally, therefore this lane
+            // never runs on Launcher main. Keep early boot entirely free of config IPC.
             val remaining = BOOT_MIN_UPTIME_MS - SystemClock.elapsedRealtime()
             if (remaining > 0L) SystemClock.sleep(remaining)
 
-            // Wait until the Launcher Application exists and credential-encrypted user storage
-            // is unlocked. Before this point the module remains a complete no-op.
-            var context: Context? = null
-            while (generation == bootstrapGeneration.get()) {
-                context = module.currentContext()
+            // Prefer waiting for user unlock, but do not make hook registration depend on it.
+            val unlockDeadline = SystemClock.elapsedRealtime() + 30_000L
+            while (generation == bootstrapGeneration.get() &&
+                SystemClock.elapsedRealtime() < unlockDeadline
+            ) {
+                val context = module.currentContext()
                 if (context != null) {
                     val userManager = context.getSystemService(UserManager::class.java)
                     if (userManager == null || userManager.isUserUnlocked) break
@@ -122,47 +159,32 @@ object LauncherStabilityHook {
             SystemClock.sleep(APP_READY_GRACE_MS)
             if (generation != bootstrapGeneration.get()) return
 
-            // RemotePreferences creation performs Binder I/O. Keep every attempt off the
-            // Launcher main thread; failure leaves the process 100% stock and retries later.
-            var attached = false
             for (attempt in 1..PREF_MAX_ATTEMPTS) {
                 if (generation != bootstrapGeneration.get()) return
-                attached = attachPrefs(module)
-                if (attached) break
-                module.log(Log.WARN, TAG, "prefs attach attempt $attempt failed; staying stock")
+                if (attachPrefs(module)) {
+                    module.log(Log.INFO, TAG, "remote prefs attached on attempt $attempt")
+                    return
+                }
+                module.log(
+                    Log.WARN,
+                    TAG,
+                    "prefs attach attempt $attempt failed; hooks stay loaded in pass-through mode"
+                )
                 SystemClock.sleep(PREF_RETRY_MS)
             }
-            if (!attached || generation != bootstrapGeneration.get()) {
-                module.log(Log.ERROR, TAG, "boot-safe init gave up; Launcher remains stock")
-                return
-            }
 
-            // Hook registration itself is deferred until the Launcher main queue is idle.
-            // This avoids racing class loading / first layout even after preferences are ready.
-            mainHandler.post {
-                if (generation != bootstrapGeneration.get()) return@post
-                Looper.myQueue().addIdleHandler {
-                    if (generation == bootstrapGeneration.get() &&
-                        hooksInstalled.compareAndSet(false, true)
-                    ) {
-                        runCatching {
-                            installHooks(module, loader)
-                        }.onFailure {
-                            hooksInstalled.set(false)
-                            module.log(
-                                Log.ERROR,
-                                TAG,
-                                "idle hook install failed; Launcher remains stock",
-                                it
-                            )
-                        }
-                    }
-                    false
-                }
-            }
+            module.log(
+                Log.ERROR,
+                TAG,
+                "prefs unavailable; hooks remain loaded but all features stay at safe defaults"
+            )
         } catch (t: Throwable) {
-            // Fail open: never let module initialization take Launcher down.
-            module.log(Log.ERROR, TAG, "boot-safe init failed; Launcher remains stock", t)
+            module.log(
+                Log.ERROR,
+                TAG,
+                "config bootstrap failed; hooks remain loaded in safe pass-through mode",
+                t
+            )
         }
     }
 
@@ -174,7 +196,7 @@ object LauncherStabilityHook {
             module.log(
                 Log.ERROR,
                 TAG,
-                "legacy repack detected; refusing to inject: ${foundLegacy.joinToString()}"
+                "legacy repack detected; refusing functional injection: ${foundLegacy.joinToString()}"
             )
             return
         }
@@ -188,7 +210,7 @@ object LauncherStabilityHook {
         module.log(
             if (installed > 0) Log.INFO else Log.WARN,
             TAG,
-            "boot-safe hooks installed=$installed config=$config"
+            "hook skeleton installed=$installed config=$config"
         )
     }
     fun prepareHotReload() {
