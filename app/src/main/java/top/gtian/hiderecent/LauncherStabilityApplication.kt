@@ -62,6 +62,12 @@ internal object LauncherRemotePrefsSync {
             LauncherStabilityPrefs.STRING_KEYS.forEach { key ->
                 editor.putString(key, prefs.getString(key, null))
             }
+            LauncherStabilityPrefs.INT_KEYS.forEach { key ->
+                editor.putInt(key, prefs.getInt(key, 0))
+            }
+            LauncherStabilityPrefs.FLOAT_KEYS.forEach { key ->
+                editor.putFloat(key, prefs.getFloat(key, 0f))
+            }
             editor.apply()
         }.onFailure {
             Log.w(Main.TAG, "launcher prefs sync failed", it)
