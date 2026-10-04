@@ -38,6 +38,7 @@ internal object LauncherExtendedFeatures {
         val removeFolderPreviewBg: Boolean = false,
         val removeUpdateGreenDot: Boolean = false,
         val hideRecentsDock: Boolean = false,
+        val restorePinCapsule: Boolean = false,
         val recentsLongPressAppInfo: Boolean = false,
         val disableAutoFocusNextTask: Boolean = false,
         val enableIndicatorEntry: Boolean = false,
@@ -101,6 +102,9 @@ internal object LauncherExtendedFeatures {
             ),
             hideRecentsDock = prefs.getBoolean(
                 LauncherStabilityPrefs.KEY_HIDE_RECENTS_DOCK, false
+            ),
+            restorePinCapsule = prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_RESTORE_PIN_CAPSULE, false
             ),
             recentsLongPressAppInfo = prefs.getBoolean(
                 LauncherStabilityPrefs.KEY_RECENTS_LONG_PRESS_APP_INFO, false
@@ -212,6 +216,7 @@ internal object LauncherExtendedFeatures {
         count += hookFolderPreviewBackground(module, loader)
         count += hookUpdateGreenDot(module, loader)
         count += hookRecentsDock(module, loader)
+        count += hookPinCapsuleGate(module, loader)
         count += hookRecentsAppInfo(module, loader)
         count += hookAutoFocus(module, loader)
         count += hookIndicatorEntry(module, loader)
@@ -459,6 +464,38 @@ internal object LauncherExtendedFeatures {
             field.isAccessible = true
             field.get(listenerInfo) as? View.OnLongClickListener
         }.getOrNull()
+
+    /**
+     * Restore the OEM ColorOS 17 "Pin to Capsule / Fluid Cloud" recent-task shortcut.
+     *
+     * OplusTaskShortcutsFactory first checks AppFeatureUtils.isSupportPinCapsule().
+     * We only restore that global feature gate. The stock CapsuleManager.isTaskSupportPin()
+     * still decides per task/app support, and stock pinToCapsule()/unpinCapsule() continue
+     * to call the SystemUI Seedling provider.
+     */
+    private fun hookPinCapsuleGate(module: Main, loader: ClassLoader): Int {
+        val cls = loadClass(loader, "com.android.common.util.AppFeatureUtils")
+            ?: return 0
+
+        var count = 0
+        cls.declaredMethods
+            .filter {
+                it.name == "isSupportPinCapsule" &&
+                    it.parameterTypes.isEmpty() &&
+                    it.returnType == Boolean::class.javaPrimitiveType
+            }
+            .forEachIndexed { index, method ->
+                count += hook(
+                    module,
+                    method,
+                    "capsule/supportGate/$index"
+                ) { chain ->
+                    if (config.restorePinCapsule) true else chain.proceed()
+                }
+            }
+
+        return count
+    }
 
     private fun hookAutoFocus(module: Main, loader: ClassLoader): Int {
         val cls = loadClass(loader, "com.android.common.util.AppFeatureUtils") ?: return 0
