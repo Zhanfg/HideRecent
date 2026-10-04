@@ -124,6 +124,16 @@
     <string name="perf_engine_enabled">启用 Performance Engine</string>
     <string name="perf_engine_enabled_desc">关闭时所有性能 Hook 保持原厂透传；热路径缓存仍只保存反射元数据，不进行持续轮询。</string>
 
+    <string name="perf_oem_native_section">OPlus 原生性能路径</string>
+    <string name="perf_oem_async_task_launch">异步 TaskView 启动动画</string>
+    <string name="perf_oem_async_task_launch_desc">强制开放 Launcher 17.3.12 内置 enableAsyncTaskViewLaunchWindowAnim()。只抬 OEM feature gate，实际线程、动画与生命周期仍由系统桌面原生代码负责。</string>
+    <string name="perf_oem_interrupt_spring">TaskView 可中断 Spring</string>
+    <string name="perf_oem_interrupt_spring_desc">开放 enableTaskViewInterruptSpringAnim()，让快速连续操作时优先走厂商自己的可中断弹簧路径，而不是等待前一段动画完整结束。</string>
+    <string name="perf_oem_async_spring_scroll">后台异步 Spring Scroll</string>
+    <string name="perf_oem_async_spring_scroll_desc">开放 enableTaskWindowAsyncSpringScroll()，使用 OPlus 已存在的异步任务窗口弹簧滚动实现；不改 SurfaceControl 矩阵。</string>
+    <string name="perf_oem_swipe_home_spring">原生上滑回桌面窗口 Spring</string>
+    <string name="perf_oem_swipe_home_spring_desc">同时开放 isSupportRecentsSwipeUpWindowSpring() 并关闭其 negative disable gate；具体窗口 Spring 参数仍完全使用 ColorOS 原生值。</string>
+
     <string name="perf_recents_section">多任务切换</string>
     <string name="perf_adaptive_recents">速度自适应卡片吸附</string>
     <string name="perf_adaptive_recents_desc">慢拖保持精细控制，快速甩动按当前速度逐渐缩短 settle 时间，避免每次都用固定倍速。</string>
