@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class LauncherStabilityApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        DynamicColors.applyToActivitiesIfAvailable(this)
         LauncherRemotePrefsSync.start(this)
     }
 }
