@@ -135,6 +135,26 @@
     <string name="perf_workspace_drag_paging_desc">仅在 Workspace 处于 onDragStart → onDragEnd 期间缩短分页 snap duration；正常桌面左右翻页保持系统原值。</string>
     <string name="perf_drag_page_multiplier">拖动跨页时长倍率</string>
 
+    <string name="flex_bridge_title">小窗 / 分屏 Bridge</string>
+    <string name="flex_bridge_desc">独立作用于 SmartSidebar 与 OplusFlexibleWindowUI，不进入 system_server。保留 ColorOS 原生 OplusZoomWindowManager、FlexibleTaskController 与分屏状态机，只减少重复请求和同帧重复布局。</string>
+
+    <string name="flex_master_section">总开关</string>
+    <string name="flex_bridge_enabled">启用 Flexible Window Bridge</string>
+    <string name="flex_bridge_enabled_desc">关闭时 SmartSidebar 与 com.oplus.pscanvas 中的桥接 Hook 全部保持原厂透传；不会改变应用小窗兼容白名单。</string>
+
+    <string name="flex_sidebar_section">智能侧边栏</string>
+    <string name="flex_zoom_debounce">过滤重复小窗启动请求</string>
+    <string name="flex_zoom_debounce_desc">仅阻止极短时间内完全相同 Intent 的重复 startActivityAsZoomWindow；首个请求仍完整走 OplusZoomWindowManager.startZoomWindow、多用户/分身与失败回调。</string>
+    <string name="flex_zoom_debounce_ms">小窗重复请求窗口</string>
+    <string name="flex_split_debounce">过滤重复分屏拖放请求</string>
+    <string name="flex_split_debounce_desc">阻止同一个 SplitScreenHandler 在极短时间重复创建 DragAndDrop；不会替换系统分屏 Intent、WM Shell 或 StageCoordinator。</string>
+    <string name="flex_split_debounce_ms">分屏重复请求窗口</string>
+
+    <string name="flex_canvas_section">Flexible Window UI</string>
+    <string name="flex_resize_dedup">去除同帧重复窗口 resize</string>
+    <string name="flex_resize_dedup_desc">ColorOS 17 的 onLayout、notifyUpdateLayout、changeTaskInfoRect、onTaskCreated/onTaskReplaced 都会汇聚到 FlexibleTaskView.resize(Rect)。这里只跳过同一 FlexibleTaskView、同一 Rect、极短窗口内的重复调用；init、surfaceReplaced、release、onActivityResumed 会立即清缓存。</string>
+    <string name="flex_resize_dedup_ms">Resize 去重时间窗</string>
+
     <string name="animation_engine_title">实验动画引擎</string>
     <string name="animation_engine_desc">所有动画增强都有独立总开关。实现限制在 Launcher View、OEM Animator 与现有 Recents Spring 层，不直接写 SurfaceControl.Transaction 矩阵。</string>
 
