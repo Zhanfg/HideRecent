@@ -154,7 +154,7 @@
 
     <string name="flex_canvas_section">Flexible Window UI</string>
     <string name="flex_resize_dedup">去除同帧重复窗口 resize</string>
-    <string name="flex_resize_dedup_desc">ColorOS 17 的 onLayout、notifyUpdateLayout、changeTaskInfoRect、onTaskCreated/onTaskReplaced 都会汇聚到 FlexibleTaskView.resize(Rect)。这里只跳过同一 FlexibleTaskView、同一 Rect、极短窗口内的重复调用；init、surfaceReplaced、release、onActivityResumed 会立即清缓存。</string>
+    <string name="flex_resize_dedup_desc">ColorOS 17 的 onLayout、任务创建/替换与内部布局更新都会汇聚到 FlexibleTaskView.resize(Rect)。这里只跳过同一 FlexibleTaskView、同一 Rect、极短窗口内的重复调用，从而减少 executor 排队与重复 WindowContainerTransaction 路径。所有 Surface、Activity、task appeared/info/replaced/orientation/vanished/reparent 生命周期边界都会先清缓存。</string>
     <string name="flex_resize_dedup_ms">Resize 去重时间窗</string>
 
     <string name="animation_engine_title">实验动画引擎</string>
