@@ -63,10 +63,16 @@ internal object LauncherRemotePrefsSync {
                 editor.putString(key, prefs.getString(key, null))
             }
             LauncherStabilityPrefs.INT_KEYS.forEach { key ->
-                editor.putInt(key, prefs.getInt(key, 0))
+                editor.putInt(
+                    key,
+                    prefs.getInt(key, LauncherStabilityPrefs.intDefault(key))
+                )
             }
             LauncherStabilityPrefs.FLOAT_KEYS.forEach { key ->
-                editor.putFloat(key, prefs.getFloat(key, 0f))
+                editor.putFloat(
+                    key,
+                    prefs.getFloat(key, LauncherStabilityPrefs.floatDefault(key))
+                )
             }
             editor.apply()
         }.onFailure {
