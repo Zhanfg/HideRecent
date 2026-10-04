@@ -34,6 +34,13 @@ class LauncherStabilityActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        prefs = getSharedPreferences(
+            LauncherStabilityPrefs.PREFS_NAME,
+            MODE_PRIVATE
+        )
+        applyDynamicColorsIfEnabled()
+
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.activity_launcher_stability)
 
@@ -44,7 +51,7 @@ class LauncherStabilityActivity : AppCompatActivity() {
         supportActionBar?.title = getString(R.string.app_name)
         applyInsets()
 
-        prefs = getSharedPreferences(LauncherStabilityPrefs.PREFS_NAME, MODE_PRIVATE)
+        bindDynamicColor(findViewById(R.id.switchUseDynamicColor))
 
         bind(
             findViewById(R.id.switchHapticEffects),
@@ -87,6 +94,43 @@ class LauncherStabilityActivity : AppCompatActivity() {
 
         findViewById<TextView>(R.id.statusText).text =
             getString(R.string.launcher_apply_note)
+    }
+
+    private fun applyDynamicColorsIfEnabled() {
+        if (!prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_USE_DYNAMIC_COLOR,
+                false
+            )
+        ) {
+            return
+        }
+
+        runCatching {
+            val cls = Class.forName(
+                "com.google.android.material.color.DynamicColors"
+            )
+            val method = cls.getMethod(
+                "applyToActivityIfAvailable",
+                android.app.Activity::class.java
+            )
+            method.invoke(null, this)
+        }
+    }
+
+    private fun bindDynamicColor(view: MaterialSwitch) {
+        view.isChecked = prefs.getBoolean(
+            LauncherStabilityPrefs.KEY_USE_DYNAMIC_COLOR,
+            false
+        )
+        view.setOnCheckedChangeListener { _, checked ->
+            prefs.edit()
+                .putBoolean(
+                    LauncherStabilityPrefs.KEY_USE_DYNAMIC_COLOR,
+                    checked
+                )
+                .apply()
+            recreate()
+        }
     }
 
     private fun configureSystemBars() {
