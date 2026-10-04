@@ -83,6 +83,13 @@ internal object LauncherExtendedFeatures {
         val wrapper: View.OnLongClickListener
     )
 
+    private data class PinDispatchInfo(
+        val taskId: Int?,
+        val packageName: String?,
+        val userId: Int?,
+        val expectedPinned: Boolean
+    )
+
     private val recentsLongClickWraps = Collections.synchronizedMap(
         WeakHashMap<View, LongClickWrap>()
     )
@@ -563,47 +570,37 @@ internal object LauncherExtendedFeatures {
                         return@hook chain.proceed()
                     }
 
-                    val taskId = extractPinTaskId(
+                    val info = extractPinDispatchInfo(
                         method.name,
                         chain.args
                     )
+                    val target = chain.thisObject
 
                     module.log(
                         Log.INFO,
                         TAG,
-                        "PinTask dispatch begin ${method.name} taskId=$taskId"
+                        "PinTask dispatch begin ${method.name} " +
+                            "taskId=${info.taskId} pkg=${info.packageName}"
                     )
+
                     try {
                         val result = chain.proceed()
 
-                        if (taskId != null) {
-                            mainHandler.postDelayed({
-                                val pinned = runCatching {
-                                    val target = chain.thisObject
-                                        ?: return@runCatching null
-                                    invokeMethodDeep(
-                                        target,
-                                        "isTaskPinInCapsule",
-                                        arrayOf<Class<*>?>(
-                                            Int::class.javaPrimitiveType
-                                        ),
-                                        arrayOf<Any?>(taskId)
-                                    ) as? Boolean
-                                }.getOrNull()
-
-                                module.log(
-                                    Log.INFO,
-                                    TAG,
-                                    "PinTask state after ${method.name}: " +
-                                        "taskId=$taskId pinned=$pinned"
-                                )
-                            }, 220L)
+                        if (target != null && info.taskId != null) {
+                            schedulePinStateProbe(
+                                module = module,
+                                target = target,
+                                info = info,
+                                delayMs = 220L,
+                                finalProbe = false
+                            )
                         }
 
                         module.log(
                             Log.INFO,
                             TAG,
-                            "PinTask dispatch end ${method.name} taskId=$taskId"
+                            "PinTask dispatch end ${method.name} " +
+                                "taskId=${info.taskId}"
                         )
                         result
                     } catch (t: Throwable) {
@@ -621,20 +618,144 @@ internal object LauncherExtendedFeatures {
         return count
     }
 
-    private fun extractPinTaskId(
+    private fun extractPinDispatchInfo(
         methodName: String,
         args: List<Any?>
-    ): Int? {
+    ): PinDispatchInfo {
         if (methodName == "unpinCapsule") {
-            return (args.firstOrNull() as? Number)?.toInt()
+            return PinDispatchInfo(
+                taskId = (args.firstOrNull() as? Number)?.toInt(),
+                packageName = null,
+                userId = null,
+                expectedPinned = false
+            )
         }
 
         if (methodName == "pinToCapsule") {
-            val param = args.firstOrNull() ?: return null
-            return (invokeNoArgDeep(param, "getTaskId") as? Number)?.toInt()
+            val param = args.firstOrNull()
+            return PinDispatchInfo(
+                taskId = param?.let {
+                    (invokeNoArgDeep(it, "getTaskId") as? Number)?.toInt()
+                },
+                packageName = param?.let {
+                    invokeNoArgDeep(it, "getPackageName") as? String
+                },
+                userId = param?.let {
+                    (invokeNoArgDeep(it, "getUserId") as? Number)?.toInt()
+                },
+                expectedPinned = true
+            )
         }
 
-        return null
+        return PinDispatchInfo(
+            taskId = null,
+            packageName = null,
+            userId = null,
+            expectedPinned = false
+        )
+    }
+
+    private fun schedulePinStateProbe(
+        module: Main,
+        target: Any,
+        info: PinDispatchInfo,
+        delayMs: Long,
+        finalProbe: Boolean
+    ) {
+        val taskId = info.taskId ?: return
+
+        mainHandler.postDelayed({
+            val pinned = runCatching {
+                invokeMethodDeep(
+                    target,
+                    "isTaskPinInCapsule",
+                    arrayOf<Class<*>?>(
+                        Int::class.javaPrimitiveType
+                    ),
+                    arrayOf<Any?>(taskId)
+                ) as? Boolean
+            }.getOrNull()
+
+            val matches = pinned == info.expectedPinned
+
+            if (matches) {
+                val hansFrozen = if (
+                    info.expectedPinned &&
+                    info.packageName != null &&
+                    info.userId != null
+                ) {
+                    queryHansFrozen(
+                        info.packageName,
+                        info.userId
+                    )
+                } else {
+                    null
+                }
+
+                module.log(
+                    Log.INFO,
+                    TAG,
+                    "PinTask state confirmed taskId=$taskId " +
+                        "pinned=$pinned expected=${info.expectedPinned} " +
+                        "pkg=${info.packageName} hansFrozen=$hansFrozen"
+                )
+                return@postDelayed
+            }
+
+            if (!finalProbe) {
+                module.log(
+                    Log.WARN,
+                    TAG,
+                    "PinTask state not settled at ${delayMs}ms: " +
+                        "taskId=$taskId pinned=$pinned " +
+                        "expected=${info.expectedPinned}; rechecking"
+                )
+                schedulePinStateProbe(
+                    module = module,
+                    target = target,
+                    info = info,
+                    delayMs = 1_200L,
+                    finalProbe = true
+                )
+            } else {
+                module.log(
+                    Log.WARN,
+                    TAG,
+                    "PinTask state mismatch after final probe: " +
+                        "taskId=$taskId pinned=$pinned " +
+                        "expected=${info.expectedPinned}. " +
+                        "No retry or framework state mutation was performed."
+                )
+            }
+        }, delayMs)
+    }
+
+    /**
+     * Read-only Hans state probe. This does not unfreeze, raise adj or write any lock list.
+     */
+    private fun queryHansFrozen(
+        packageName: String,
+        userId: Int
+    ): Boolean? {
+        val currentLoader = loader ?: return null
+
+        return runCatching {
+            val cls = currentLoader.loadClass(
+                "android.app.OplusActivityManager"
+            )
+            val instance = cls.getMethod("getInstance")
+                .invoke(null)
+            val method = cls.getMethod(
+                "isFrozenByHans",
+                String::class.java,
+                Int::class.javaPrimitiveType
+            )
+            method.invoke(
+                instance,
+                packageName,
+                userId
+            ) as? Boolean
+        }.getOrNull()
     }
 
     private fun hookAutoFocus(module: Main, loader: ClassLoader): Int {
