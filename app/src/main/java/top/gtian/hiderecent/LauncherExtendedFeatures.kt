@@ -234,15 +234,15 @@ internal object LauncherExtendedFeatures {
                                         val isFolder = invokeMethodDeep(
                                             child,
                                             "isOfType",
-                                            arrayOf(Int::class.javaPrimitiveType),
-                                            arrayOf(folderType)
+                                            arrayOf<Class<*>?>(Int::class.javaPrimitiveType),
+                                            arrayOf<Any?>(folderType)
                                         ) as? Boolean ?: false
                                         if (isFolder) {
                                             invokeMethodDeep(
                                                 child,
                                                 "close",
-                                                arrayOf(Boolean::class.javaPrimitiveType),
-                                                arrayOf(animate)
+                                                arrayOf<Class<*>?>(Boolean::class.javaPrimitiveType),
+                                                arrayOf<Any?>(animate)
                                             )
                                         }
                                     }
@@ -309,9 +309,12 @@ internal object LauncherExtendedFeatures {
                     if (config.hideRecentsDock &&
                         method.parameterTypes[0] == Boolean::class.javaPrimitiveType
                     ) {
-                        chain.args[0] = true
+                        val args = chain.args.toTypedArray()
+                        args[0] = true
+                        chain.proceed(args)
+                    } else {
+                        chain.proceed()
                     }
-                    chain.proceed()
                 }
             }
         return count
