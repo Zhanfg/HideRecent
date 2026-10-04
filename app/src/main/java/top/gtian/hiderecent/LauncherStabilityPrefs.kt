@@ -78,6 +78,15 @@ object LauncherStabilityPrefs {
     const val KEY_ANIM_RUNNING_SCALE_VALUE = "anim_running_scale_value"
     const val KEY_ANIM_TRANSITION_MULTIPLIER = "anim_transition_multiplier"
 
+    // Performance engine. Disabled by default and independent from animation tuning.
+    const val KEY_PERF_ENGINE_ENABLED = "perf_engine_enabled"
+    const val KEY_PERF_ADAPTIVE_RECENTS = "perf_adaptive_recents"
+    const val KEY_PERF_DECISIVE_FLING = "perf_decisive_fling"
+    const val KEY_PERF_WORKSPACE_DRAG_PAGING = "perf_workspace_drag_paging"
+    const val KEY_PERF_RECENTS_SETTLE_FLOOR = "perf_recents_settle_floor"
+    const val KEY_PERF_FLING_GAIN = "perf_fling_gain"
+    const val KEY_PERF_DRAG_PAGE_MULTIPLIER = "perf_drag_page_multiplier"
+
     val BOOLEAN_KEYS = arrayOf(
         KEY_HAPTIC_EFFECTS,
         KEY_HIDE_WORKSPACE_LABELS,
@@ -123,7 +132,12 @@ object LauncherStabilityPrefs {
         KEY_ANIM_OVERSCROLL_TUNING,
         KEY_ANIM_FLING_TUNING,
         KEY_ANIM_RUNNING_SCALE,
-        KEY_ANIM_TRANSITION_TIMING
+        KEY_ANIM_TRANSITION_TIMING,
+
+        KEY_PERF_ENGINE_ENABLED,
+        KEY_PERF_ADAPTIVE_RECENTS,
+        KEY_PERF_DECISIVE_FLING,
+        KEY_PERF_WORKSPACE_DRAG_PAGING
     )
 
     val STRING_KEYS = arrayOf(
@@ -154,7 +168,11 @@ object LauncherStabilityPrefs {
         KEY_ANIM_OVERSCROLL_MULTIPLIER,
         KEY_ANIM_FLING_MULTIPLIER,
         KEY_ANIM_RUNNING_SCALE_VALUE,
-        KEY_ANIM_TRANSITION_MULTIPLIER
+        KEY_ANIM_TRANSITION_MULTIPLIER,
+
+        KEY_PERF_RECENTS_SETTLE_FLOOR,
+        KEY_PERF_FLING_GAIN,
+        KEY_PERF_DRAG_PAGE_MULTIPLIER
     )
 
     val ALL_KEYS =
@@ -187,6 +205,9 @@ object LauncherStabilityPrefs {
         KEY_ANIM_FLING_MULTIPLIER -> 1f
         KEY_ANIM_RUNNING_SCALE_VALUE -> 1f
         KEY_ANIM_TRANSITION_MULTIPLIER -> 1f
+        KEY_PERF_RECENTS_SETTLE_FLOOR -> 0.64f
+        KEY_PERF_FLING_GAIN -> 1.10f
+        KEY_PERF_DRAG_PAGE_MULTIPLIER -> 0.72f
         else -> 0f
     }
 }
