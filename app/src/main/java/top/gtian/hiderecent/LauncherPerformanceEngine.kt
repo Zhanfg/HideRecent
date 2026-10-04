@@ -125,7 +125,7 @@ internal object LauncherPerformanceEngine {
 
                     (stock * factor)
                         .roundToInt()
-                        .coerceIn(80, stock)
+                        .coerceIn(minOf(80, stock), stock)
                 }
             }
 
@@ -234,7 +234,7 @@ internal object LauncherPerformanceEngine {
 
                 (stock * config.dragPageMultiplier)
                     .roundToInt()
-                    .coerceIn(70, stock)
+                    .coerceIn(minOf(70, stock), stock)
             }
         }
 
