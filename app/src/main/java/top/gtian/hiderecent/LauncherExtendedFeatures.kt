@@ -499,48 +499,15 @@ internal object LauncherExtendedFeatures {
     }
 
     /**
-     * Read-only diagnostics for the stock ColorOS 17 PinTask/Capsule path.
+     * Low-frequency diagnostics for actual PinTask dispatch only.
      *
-     * No result or argument is modified here. When the restore switch is enabled we only
-     * record which OEM stage was actually reached, so device validation can distinguish:
-     * feature gate -> per-task support -> current pin state -> pin/unpin dispatch.
+     * Do not hook isTaskSupportPin()/isTaskPinInCapsule(): those methods are queried while
+     * recent-task menus are assembled and logging them adds pointless hot-path work.
      */
     private fun hookPinCapsuleDiagnostics(module: Main, loader: ClassLoader): Int {
         val cls = loadClass(loader, "com.android.launcher3.capsule.CapsuleManager")
             ?: return 0
         var count = 0
-
-        cls.declaredMethods
-            .filter {
-                it.name in setOf("isTaskSupportPin", "isTaskPinInCapsule")
-            }
-            .forEachIndexed { index, method ->
-                count += hook(
-                    module,
-                    method,
-                    "capsule/diag/${method.name}/$index"
-                ) { chain ->
-                    val result = chain.proceed()
-                    if (config.restorePinCapsule) {
-                        val argSummary = chain.args.joinToString(
-                            prefix = "[",
-                            postfix = "]"
-                        ) { arg ->
-                            when (arg) {
-                                null -> "null"
-                                is Number, is Boolean, is String -> arg.toString()
-                                else -> arg.javaClass.simpleName
-                            }
-                        }
-                        module.log(
-                            Log.INFO,
-                            TAG,
-                            "PinTask diag ${method.name} args=$argSummary result=$result"
-                        )
-                    }
-                    result
-                }
-            }
 
         cls.declaredMethods
             .filter {
@@ -556,28 +523,17 @@ internal object LauncherExtendedFeatures {
                         return@hook chain.proceed()
                     }
 
-                    val args = chain.args.joinToString(
-                        prefix = "[",
-                        postfix = "]"
-                    ) { arg ->
-                        when (arg) {
-                            null -> "null"
-                            is Number, is Boolean, is String -> arg.toString()
-                            else -> arg.javaClass.simpleName
-                        }
-                    }
-
                     module.log(
                         Log.INFO,
                         TAG,
-                        "PinTask dispatch begin ${method.name} args=$args"
+                        "PinTask dispatch begin ${method.name}"
                     )
                     try {
                         val result = chain.proceed()
                         module.log(
                             Log.INFO,
                             TAG,
-                            "PinTask dispatch end ${method.name} result=$result"
+                            "PinTask dispatch end ${method.name}"
                         )
                         result
                     } catch (t: Throwable) {
