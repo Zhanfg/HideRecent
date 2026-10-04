@@ -6,6 +6,10 @@
     <string name="launcher_baseline">基线：系统桌面 17.3.12 · Android 17</string>
     <string name="launcher_strategy">官方 Launcher APK 保持不变；功能通过 LSPosed 运行时注入。检测到旧 ZuyQA 重打包类时将自动拒绝注入。</string>
     <string name="launcher_safe_features">Safe Features</string>
+    <string name="appearance_title">界面与配色</string>
+    <string name="use_dynamic_color">使用系统动态取色</string>
+    <string name="use_dynamic_color_desc">默认关闭，使用接近 LuckyTool 的经典 Material 3 紫灰色板；开启后才跟随系统壁纸动态取色。</string>
+
     <string name="haptic_card_title">触觉反馈</string>
     <string name="recents_display_title">最近任务显示</string>
 
