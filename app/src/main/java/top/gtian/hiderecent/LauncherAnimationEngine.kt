@@ -13,6 +13,7 @@ import java.lang.reflect.Method
 import java.util.Collections
 import java.util.WeakHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -63,6 +64,13 @@ internal object LauncherAnimationEngine {
     private val originalCameraDistance = Collections.synchronizedMap(
         WeakHashMap<View, Float>()
     )
+    private val lastAppliedRotationY = Collections.synchronizedMap(
+        WeakHashMap<View, Float>()
+    )
+
+    private val noArgMethodCache = ConcurrentHashMap<String, Method>()
+    private val singleFloatMethodCache = ConcurrentHashMap<String, Method>()
+    private val missingMethods = ConcurrentHashMap.newKeySet<String>()
 
     fun refresh(prefs: SharedPreferences) {
         config = Config(
@@ -140,6 +148,10 @@ internal object LauncherAnimationEngine {
         tiltedViews.clear()
         originalRotationY.clear()
         originalCameraDistance.clear()
+        lastAppliedRotationY.clear()
+        noArgMethodCache.clear()
+        singleFloatMethodCache.clear()
+        missingMethods.clear()
     }
 
     fun hook(module: Main, loader: ClassLoader): Int {
@@ -273,7 +285,11 @@ internal object LauncherAnimationEngine {
             .forEachIndexed { index, method ->
                 count += hook(module, method, "recents/snap/$index") { chain ->
                     val stock = (chain.proceed() as? Number)?.toInt() ?: 0
-                    if (!config.enabled || !config.snapTuning || stock <= 0) {
+                    if (!config.enabled ||
+                        !config.snapTuning ||
+                        LauncherPerformanceEngine.isAdaptiveRecentsActive() ||
+                        stock <= 0
+                    ) {
                         stock
                     } else {
                         (stock * config.snapMultiplier)
@@ -439,18 +455,33 @@ internal object LauncherAnimationEngine {
             .coerceIn(-1f, 1f)
 
         val base = originalRotationY[view] ?: 0f
-        view.rotationY = base - normalized * config.recentsTiltDeg
+        val targetRotation = base - normalized * config.recentsTiltDeg
+        val last = lastAppliedRotationY[view]
+
+        // updateScaleDimAlpha() is a per-frame hot path. Avoid redundant property writes.
+        if (last == null || abs(last - targetRotation) >= 0.08f) {
+            view.rotationY = targetRotation
+            lastAppliedRotationY[view] = targetRotation
+        }
 
         val density = view.resources.displayMetrics.density
-        view.cameraDistance = 14_000f * density
+        val targetCameraDistance = 14_000f * density
+        if (abs(view.cameraDistance - targetCameraDistance) >= 1f) {
+            view.cameraDistance = targetCameraDistance
+        }
     }
 
     private fun restoreTilt(view: View) {
         synchronized(originalRotationY) {
             val rotation = originalRotationY.remove(view)
             val distance = originalCameraDistance.remove(view)
-            if (rotation != null) view.rotationY = rotation
-            if (distance != null) view.cameraDistance = distance
+            lastAppliedRotationY.remove(view)
+            if (rotation != null && abs(view.rotationY - rotation) >= 0.01f) {
+                view.rotationY = rotation
+            }
+            if (distance != null && abs(view.cameraDistance - distance) >= 1f) {
+                view.cameraDistance = distance
+            }
         }
     }
 
@@ -488,38 +519,56 @@ internal object LauncherAnimationEngine {
         runCatching { loader.loadClass(name) }.getOrNull()
 
     private fun invokeNoArgDeep(host: Any, name: String): Any? {
-        var cls: Class<*>? = host.javaClass
-        while (cls != null) {
-            val method = cls.declaredMethods.firstOrNull {
-                it.name == name && it.parameterTypes.isEmpty()
+        val start = host.javaClass
+        val key = "${start.name}#$name()"
+        if (missingMethods.contains(key)) return null
+
+        val method = noArgMethodCache[key] ?: run {
+            var cls: Class<*>? = start
+            var found: Method? = null
+            while (cls != null && found == null) {
+                found = cls.declaredMethods.firstOrNull {
+                    it.name == name && it.parameterTypes.isEmpty()
+                }
+                cls = cls.superclass
             }
-            if (method != null) {
-                return runCatching {
-                    method.isAccessible = true
-                    method.invoke(host)
-                }.getOrNull()
+            if (found == null) {
+                missingMethods += key
+                return null
             }
-            cls = cls.superclass
+            found.isAccessible = true
+            noArgMethodCache[key] = found
+            found
         }
-        return null
+
+        return runCatching { method.invoke(host) }.getOrNull()
     }
 
     private fun invokeSingleFloatDeep(host: Any, name: String, value: Float): Any? {
-        var cls: Class<*>? = host.javaClass
-        while (cls != null) {
-            val method = cls.declaredMethods.firstOrNull {
-                it.name == name &&
-                    it.parameterTypes.size == 1 &&
-                    it.parameterTypes[0] == Float::class.javaPrimitiveType
+        val start = host.javaClass
+        val key = "${start.name}#$name(float)"
+        if (missingMethods.contains(key)) return null
+
+        val method = singleFloatMethodCache[key] ?: run {
+            var cls: Class<*>? = start
+            var found: Method? = null
+            while (cls != null && found == null) {
+                found = cls.declaredMethods.firstOrNull {
+                    it.name == name &&
+                        it.parameterTypes.size == 1 &&
+                        it.parameterTypes[0] == Float::class.javaPrimitiveType
+                }
+                cls = cls.superclass
             }
-            if (method != null) {
-                return runCatching {
-                    method.isAccessible = true
-                    method.invoke(host, value)
-                }.getOrNull()
+            if (found == null) {
+                missingMethods += key
+                return null
             }
-            cls = cls.superclass
+            found.isAccessible = true
+            singleFloatMethodCache[key] = found
+            found
         }
-        return null
+
+        return runCatching { method.invoke(host, value) }.getOrNull()
     }
 }
