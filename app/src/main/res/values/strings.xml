@@ -109,6 +109,26 @@
     <string name="fold_mode_expanded">展开态</string>
     <string name="fold_mode_folded">折叠态</string>
 
+    <string name="performance_engine_title">性能与交互优化</string>
+    <string name="performance_engine_desc">以降低交互延迟和热路径开销为目标，不锁 CPU/GPU 频率、不常驻高性能模式。后台切卡与桌面拖动分别调节，默认关闭。</string>
+
+    <string name="perf_master_section">总开关</string>
+    <string name="perf_engine_enabled">启用 Performance Engine</string>
+    <string name="perf_engine_enabled_desc">关闭时所有性能 Hook 保持原厂透传；热路径缓存仍只保存反射元数据，不进行持续轮询。</string>
+
+    <string name="perf_recents_section">多任务切换</string>
+    <string name="perf_adaptive_recents">速度自适应卡片吸附</string>
+    <string name="perf_adaptive_recents_desc">慢拖保持精细控制，快速甩动按当前速度逐渐缩短 settle 时间，避免每次都用固定倍速。</string>
+    <string name="perf_recents_settle_floor">高速吸附最短倍率</string>
+    <string name="perf_decisive_fling">更明确的 Fling 判定</string>
+    <string name="perf_decisive_fling_desc">只放大超过快速甩动阈值的手势；低速手势略微降敏，减少误切卡。不会修改触摸轨迹本身。</string>
+    <string name="perf_fling_gain">高速 Fling 增益</string>
+
+    <string name="perf_workspace_section">桌面拖动</string>
+    <string name="perf_workspace_drag_paging">拖动图标时加快跨页吸附</string>
+    <string name="perf_workspace_drag_paging_desc">仅在 Workspace 处于 onDragStart → onDragEnd 期间缩短分页 snap duration；正常桌面左右翻页保持系统原值。</string>
+    <string name="perf_drag_page_multiplier">拖动跨页时长倍率</string>
+
     <string name="animation_engine_title">实验动画引擎</string>
     <string name="animation_engine_desc">所有动画增强都有独立总开关。实现限制在 Launcher View、OEM Animator 与现有 Recents Spring 层，不直接写 SurfaceControl.Transaction 矩阵。</string>
 
