@@ -3,8 +3,11 @@ package top.gtian.hiderecent
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.UserHandle
+import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
@@ -12,6 +15,8 @@ import android.widget.TextView
 import io.github.libxposed.api.XposedInterface
 import java.lang.reflect.Field
 import java.lang.reflect.Method
+import java.util.Collections
+import java.util.WeakHashMap
 import kotlin.math.max
 
 /**
@@ -33,6 +38,7 @@ internal object LauncherExtendedFeatures {
         val removeFolderPreviewBg: Boolean = false,
         val removeUpdateGreenDot: Boolean = false,
         val hideRecentsDock: Boolean = false,
+        val recentsLongPressAppInfo: Boolean = false,
         val disableAutoFocusNextTask: Boolean = false,
         val enableIndicatorEntry: Boolean = false,
         val enableDockBackground: Boolean = false,
@@ -70,6 +76,15 @@ internal object LauncherExtendedFeatures {
 
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
 
+    private data class LongClickWrap(
+        val original: View.OnLongClickListener?,
+        val wrapper: View.OnLongClickListener
+    )
+
+    private val recentsLongClickWraps = Collections.synchronizedMap(
+        WeakHashMap<View, LongClickWrap>()
+    )
+
     fun refresh(prefs: SharedPreferences) {
         config = Config(
             forceMemoryInfo = prefs.getBoolean(
@@ -86,6 +101,9 @@ internal object LauncherExtendedFeatures {
             ),
             hideRecentsDock = prefs.getBoolean(
                 LauncherStabilityPrefs.KEY_HIDE_RECENTS_DOCK, false
+            ),
+            recentsLongPressAppInfo = prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_RECENTS_LONG_PRESS_APP_INFO, false
             ),
             disableAutoFocusNextTask = prefs.getBoolean(
                 LauncherStabilityPrefs.KEY_DISABLE_AUTO_FOCUS_NEXT_TASK, false
@@ -181,6 +199,7 @@ internal object LauncherExtendedFeatures {
         config = Config()
         module = null
         loader = null
+        recentsLongClickWraps.clear()
     }
 
     fun hook(module: Main, loader: ClassLoader): Int {
@@ -193,6 +212,7 @@ internal object LauncherExtendedFeatures {
         count += hookFolderPreviewBackground(module, loader)
         count += hookUpdateGreenDot(module, loader)
         count += hookRecentsDock(module, loader)
+        count += hookRecentsAppInfo(module, loader)
         count += hookAutoFocus(module, loader)
         count += hookIndicatorEntry(module, loader)
         count += hookDockFeatures(module, loader)
@@ -340,6 +360,102 @@ internal object LauncherExtendedFeatures {
             }
         return count
     }
+
+    private fun hookRecentsAppInfo(module: Main, loader: ClassLoader): Int {
+        val cls = loadClass(loader, "com.android.quickstep.views.OplusTaskViewImpl")
+            ?: return 0
+        var count = 0
+
+        cls.declaredMethods
+            .filter { it.name == "setIcon" && it.parameterTypes.size in 1..2 }
+            .forEachIndexed { index, method ->
+                count += hook(module, method, "recents/appInfo/$index") { chain ->
+                    val result = chain.proceed()
+                    runCatching {
+                        val host = chain.thisObject ?: return@runCatching
+                        val task = invokeNoArgDeep(host, "getTask") ?: return@runCatching
+                        val key = findField(task.javaClass, "key")?.get(task)
+                            ?: return@runCatching
+                        val packageName = invokeNoArgDeep(key, "getPackageName") as? String
+                            ?: return@runCatching
+                        val userId = (findField(key.javaClass, "userId")?.get(key) as? Number)
+                            ?.toInt()
+
+                        val header = invokeNoArgDeep(host, "getHeaderView")
+                            ?: return@runCatching
+                        val icon = invokeNoArgDeep(header, "getTaskIcon") as? View
+                        val title =
+                            (invokeNoArgDeep(header, "getTitleTv") as? View)
+                                ?: (findField(header.javaClass, "titleTv")?.get(header) as? View)
+
+                        if (icon != null) wrapAppInfoLongClick(icon, packageName, userId)
+                        if (title != null) wrapAppInfoLongClick(title, packageName, userId)
+                    }.onFailure {
+                        module.log(Log.WARN, TAG, "recents app-info binding failed: ${it.message}")
+                    }
+                    result
+                }
+            }
+
+        return count
+    }
+
+    private fun wrapAppInfoLongClick(
+        view: View,
+        packageName: String,
+        userId: Int?
+    ) {
+        synchronized(recentsLongClickWraps) {
+            val current = readLongClickListener(view)
+            val existing = recentsLongClickWraps[view]
+            if (existing != null && current === existing.wrapper) return
+
+            val original = current
+            val wrapper = View.OnLongClickListener { clicked ->
+                if (!config.recentsLongPressAppInfo) {
+                    return@OnLongClickListener original?.onLongClick(clicked) ?: false
+                }
+
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.parse("package:$packageName"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                val opened = runCatching {
+                    if (userId != null) {
+                        val method = Context::class.java.getMethod(
+                            "startActivityAsUser",
+                            Intent::class.java,
+                            UserHandle::class.java
+                        )
+                        method.invoke(clicked.context, intent, UserHandle.of(userId))
+                    } else {
+                        clicked.context.startActivity(intent)
+                    }
+                    true
+                }.getOrElse {
+                    runCatching {
+                        clicked.context.startActivity(intent)
+                        true
+                    }.getOrDefault(false)
+                }
+
+                opened || (original?.onLongClick(clicked) ?: false)
+            }
+
+            view.setOnLongClickListener(wrapper)
+            recentsLongClickWraps[view] = LongClickWrap(original, wrapper)
+        }
+    }
+
+    private fun readLongClickListener(view: View): View.OnLongClickListener? =
+        runCatching {
+            val getListenerInfo = View::class.java.getDeclaredMethod("getListenerInfo")
+            getListenerInfo.isAccessible = true
+            val listenerInfo = getListenerInfo.invoke(view) ?: return@runCatching null
+            val field = listenerInfo.javaClass.getDeclaredField("mOnLongClickListener")
+            field.isAccessible = true
+            field.get(listenerInfo) as? View.OnLongClickListener
+        }.getOrNull()
 
     private fun hookAutoFocus(module: Main, loader: ClassLoader): Int {
         val cls = loadClass(loader, "com.android.common.util.AppFeatureUtils") ?: return 0
