@@ -65,6 +65,7 @@ object LauncherStabilityPrefs {
     const val KEY_ANIM_OVERSCROLL_TUNING = "anim_overscroll_tuning"
     const val KEY_ANIM_FLING_TUNING = "anim_fling_tuning"
     const val KEY_ANIM_RUNNING_SCALE = "anim_running_scale"
+    const val KEY_ANIM_TRANSITION_TIMING = "anim_transition_timing"
 
     const val KEY_ANIM_ICON_PULSE_SCALE = "anim_icon_pulse_scale"
     const val KEY_ANIM_ICON_TILT_DEG = "anim_icon_tilt_deg"
@@ -75,6 +76,7 @@ object LauncherStabilityPrefs {
     const val KEY_ANIM_OVERSCROLL_MULTIPLIER = "anim_overscroll_multiplier"
     const val KEY_ANIM_FLING_MULTIPLIER = "anim_fling_multiplier"
     const val KEY_ANIM_RUNNING_SCALE_VALUE = "anim_running_scale_value"
+    const val KEY_ANIM_TRANSITION_MULTIPLIER = "anim_transition_multiplier"
 
     val BOOLEAN_KEYS = arrayOf(
         KEY_HAPTIC_EFFECTS,
@@ -120,7 +122,8 @@ object LauncherStabilityPrefs {
         KEY_ANIM_SNAP_TUNING,
         KEY_ANIM_OVERSCROLL_TUNING,
         KEY_ANIM_FLING_TUNING,
-        KEY_ANIM_RUNNING_SCALE
+        KEY_ANIM_RUNNING_SCALE,
+        KEY_ANIM_TRANSITION_TIMING
     )
 
     val STRING_KEYS = arrayOf(
@@ -150,7 +153,8 @@ object LauncherStabilityPrefs {
         KEY_ANIM_SNAP_MULTIPLIER,
         KEY_ANIM_OVERSCROLL_MULTIPLIER,
         KEY_ANIM_FLING_MULTIPLIER,
-        KEY_ANIM_RUNNING_SCALE_VALUE
+        KEY_ANIM_RUNNING_SCALE_VALUE,
+        KEY_ANIM_TRANSITION_MULTIPLIER
     )
 
     val ALL_KEYS =
@@ -182,6 +186,7 @@ object LauncherStabilityPrefs {
         KEY_ANIM_OVERSCROLL_MULTIPLIER -> 1f
         KEY_ANIM_FLING_MULTIPLIER -> 1f
         KEY_ANIM_RUNNING_SCALE_VALUE -> 1f
+        KEY_ANIM_TRANSITION_MULTIPLIER -> 1f
         else -> 0f
     }
 }
