@@ -34,6 +34,13 @@
     <color name="md_theme_inverseOnSurface">#F4EFF4</color>
     <color name="md_theme_inversePrimary">#D0BCFF</color>
 
+    <!-- Legacy aliases kept for unused/older layouts in the original project. -->
+    <color name="purple_200">#D0BCFF</color>
+    <color name="purple_500">#6750A4</color>
+    <color name="purple_700">#4F378B</color>
+    <color name="teal_200">#CCC2DC</color>
+    <color name="teal_700">#625B71</color>
+
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="text_primary">#1C1B1F</color>
