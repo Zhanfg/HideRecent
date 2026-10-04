@@ -89,6 +89,15 @@ object LauncherStabilityPrefs {
     const val KEY_PERF_FLING_GAIN = "perf_fling_gain"
     const val KEY_PERF_DRAG_PAGE_MULTIPLIER = "perf_drag_page_multiplier"
 
+    // Flexible Window Bridge. Separate process scope, all disabled by default.
+    const val KEY_FLEX_BRIDGE_ENABLED = "flex_bridge_enabled"
+    const val KEY_FLEX_ZOOM_DEBOUNCE = "flex_zoom_debounce"
+    const val KEY_FLEX_SPLIT_DEBOUNCE = "flex_split_debounce"
+    const val KEY_FLEX_RESIZE_DEDUP = "flex_resize_dedup"
+    const val KEY_FLEX_ZOOM_DEBOUNCE_MS = "flex_zoom_debounce_ms"
+    const val KEY_FLEX_SPLIT_DEBOUNCE_MS = "flex_split_debounce_ms"
+    const val KEY_FLEX_RESIZE_DEDUP_MS = "flex_resize_dedup_ms"
+
     val BOOLEAN_KEYS = arrayOf(
         KEY_HAPTIC_EFFECTS,
         KEY_HIDE_WORKSPACE_LABELS,
@@ -140,7 +149,12 @@ object LauncherStabilityPrefs {
         KEY_PERF_ENGINE_ENABLED,
         KEY_PERF_ADAPTIVE_RECENTS,
         KEY_PERF_DECISIVE_FLING,
-        KEY_PERF_WORKSPACE_DRAG_PAGING
+        KEY_PERF_WORKSPACE_DRAG_PAGING,
+
+        KEY_FLEX_BRIDGE_ENABLED,
+        KEY_FLEX_ZOOM_DEBOUNCE,
+        KEY_FLEX_SPLIT_DEBOUNCE,
+        KEY_FLEX_RESIZE_DEDUP
     )
 
     val STRING_KEYS = arrayOf(
@@ -156,7 +170,10 @@ object LauncherStabilityPrefs {
         KEY_FOLDER_COLUMNS,
         KEY_DRAWER_COLUMNS,
         KEY_FOLD_MODE,
-        KEY_ICON_SIZE_DP
+        KEY_ICON_SIZE_DP,
+        KEY_FLEX_ZOOM_DEBOUNCE_MS,
+        KEY_FLEX_SPLIT_DEBOUNCE_MS,
+        KEY_FLEX_RESIZE_DEDUP_MS
     )
 
     val FLOAT_KEYS = arrayOf(
@@ -192,6 +209,9 @@ object LauncherStabilityPrefs {
         KEY_DRAWER_COLUMNS -> 4
         KEY_FOLD_MODE -> 0
         KEY_ICON_SIZE_DP -> 56
+        KEY_FLEX_ZOOM_DEBOUNCE_MS -> 220
+        KEY_FLEX_SPLIT_DEBOUNCE_MS -> 280
+        KEY_FLEX_RESIZE_DEDUP_MS -> 16
         else -> 0
     }
 
