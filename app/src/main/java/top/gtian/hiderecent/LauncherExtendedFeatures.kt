@@ -39,6 +39,7 @@ internal object LauncherExtendedFeatures {
         val removeUpdateGreenDot: Boolean = false,
         val hideRecentsDock: Boolean = false,
         val restorePinCapsule: Boolean = false,
+        val restoreFloatingWindowShortcut: Boolean = false,
         val recentsLongPressAppInfo: Boolean = false,
         val disableAutoFocusNextTask: Boolean = false,
         val enableIndicatorEntry: Boolean = false,
@@ -105,6 +106,9 @@ internal object LauncherExtendedFeatures {
             ),
             restorePinCapsule = prefs.getBoolean(
                 LauncherStabilityPrefs.KEY_RESTORE_PIN_CAPSULE, false
+            ),
+            restoreFloatingWindowShortcut = prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_RESTORE_FLOATING_WINDOW_SHORTCUT, false
             ),
             recentsLongPressAppInfo = prefs.getBoolean(
                 LauncherStabilityPrefs.KEY_RECENTS_LONG_PRESS_APP_INFO, false
@@ -217,6 +221,7 @@ internal object LauncherExtendedFeatures {
         count += hookUpdateGreenDot(module, loader)
         count += hookRecentsDock(module, loader)
         count += hookPinCapsuleGate(module, loader)
+        count += hookFloatingWindowGate(module, loader)
         count += hookPinCapsuleDiagnostics(module, loader)
         count += hookRecentsAppInfo(module, loader)
         count += hookAutoFocus(module, loader)
@@ -499,6 +504,41 @@ internal object LauncherExtendedFeatures {
     }
 
     /**
+     * Restore the OEM recent-task "Floating window" shortcut global gate.
+     *
+     * OplusTaskShortcutsFactory still performs all stock per-task checks afterwards:
+     * top/source component, displayId, split-screen state, one-hand mode and app support.
+     * We only restore AppFeatureUtils.isSupportFlexibleFloatingWindow().
+     */
+    private fun hookFloatingWindowGate(module: Main, loader: ClassLoader): Int {
+        val cls = loadClass(loader, "com.android.common.util.AppFeatureUtils")
+            ?: return 0
+
+        var count = 0
+        cls.declaredMethods
+            .filter {
+                it.name == "isSupportFlexibleFloatingWindow" &&
+                    it.parameterTypes.isEmpty() &&
+                    it.returnType == Boolean::class.javaPrimitiveType
+            }
+            .forEachIndexed { index, method ->
+                count += hook(
+                    module,
+                    method,
+                    "floatingWindow/supportGate/$index"
+                ) { chain ->
+                    if (config.restoreFloatingWindowShortcut) {
+                        true
+                    } else {
+                        chain.proceed()
+                    }
+                }
+            }
+
+        return count
+    }
+
+    /**
      * Low-frequency diagnostics for actual PinTask dispatch only.
      *
      * Do not hook isTaskSupportPin()/isTaskPinInCapsule(): those methods are queried while
@@ -523,17 +563,47 @@ internal object LauncherExtendedFeatures {
                         return@hook chain.proceed()
                     }
 
+                    val taskId = extractPinTaskId(
+                        method.name,
+                        chain.args
+                    )
+
                     module.log(
                         Log.INFO,
                         TAG,
-                        "PinTask dispatch begin ${method.name}"
+                        "PinTask dispatch begin ${method.name} taskId=$taskId"
                     )
                     try {
                         val result = chain.proceed()
+
+                        if (taskId != null) {
+                            mainHandler.postDelayed({
+                                val pinned = runCatching {
+                                    val target = chain.thisObject
+                                        ?: return@runCatching null
+                                    invokeMethodDeep(
+                                        target,
+                                        "isTaskPinInCapsule",
+                                        arrayOf<Class<*>?>(
+                                            Int::class.javaPrimitiveType
+                                        ),
+                                        arrayOf<Any?>(taskId)
+                                    ) as? Boolean
+                                }.getOrNull()
+
+                                module.log(
+                                    Log.INFO,
+                                    TAG,
+                                    "PinTask state after ${method.name}: " +
+                                        "taskId=$taskId pinned=$pinned"
+                                )
+                            }, 220L)
+                        }
+
                         module.log(
                             Log.INFO,
                             TAG,
-                            "PinTask dispatch end ${method.name}"
+                            "PinTask dispatch end ${method.name} taskId=$taskId"
                         )
                         result
                     } catch (t: Throwable) {
@@ -549,6 +619,22 @@ internal object LauncherExtendedFeatures {
             }
 
         return count
+    }
+
+    private fun extractPinTaskId(
+        methodName: String,
+        args: List<Any?>
+    ): Int? {
+        if (methodName == "unpinCapsule") {
+            return (args.firstOrNull() as? Number)?.toInt()
+        }
+
+        if (methodName == "pinToCapsule") {
+            val param = args.firstOrNull() ?: return null
+            return (invokeNoArgDeep(param, "getTaskId") as? Number)?.toInt()
+        }
+
+        return null
     }
 
     private fun hookAutoFocus(module: Main, loader: ClassLoader): Int {
