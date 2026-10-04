@@ -62,6 +62,17 @@
     <string name="unlock_task_lock_limit">解除最近任务锁定数量限制</string>
     <string name="unlock_task_lock_limit_desc">对 isAppAllowLock / isAppAllowUnlock 放宽限制；默认关闭。</string>
 
+    <string name="ext_icon_title">图标 / 角标</string>
+    <string name="custom_icon_size_enabled">自定义桌面图标尺寸</string>
+    <string name="custom_icon_size_enabled_desc">覆盖 BubbleTextView.getIconSize 的返回值；只在启用时生效，关闭后恢复系统尺寸。</string>
+    <string name="icon_size_dp">图标尺寸</string>
+    <string name="remove_shortcut_badge">隐藏快捷方式角标</string>
+    <string name="remove_shortcut_badge_desc">仅抑制 BitmapInfo 的 badgeInfo 角标，不影响应用本身图标。</string>
+    <string name="remove_work_badge">隐藏工作资料角标</string>
+    <string name="remove_work_badge_desc">仅在图标构建期间临时移除工作资料 flag，生成完成后恢复原始状态。</string>
+    <string name="remove_clone_badge">隐藏应用分身角标</string>
+    <string name="remove_clone_badge_desc">仅在图标构建期间临时移除应用分身 flag，生成完成后恢复原始状态。</string>
+
     <string name="ext_dock_title">Dock / 模糊</string>
     <string name="enable_dock_background">强制启用 Dock 背景能力</string>
     <string name="enable_dock_background_desc">开放 isSupportDockerExpandScreen，供系统桌面使用其原生 Dock 背景。</string>
