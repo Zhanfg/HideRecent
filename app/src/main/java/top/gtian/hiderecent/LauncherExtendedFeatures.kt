@@ -396,9 +396,12 @@ internal object LauncherExtendedFeatures {
                 .forEachIndexed { index, method ->
                     count += hook(module, method, "dock/alpha/$index") { chain ->
                         if (config.dockAlphaEnabled) {
-                            chain.args[0] = config.dockAlpha
+                            val args = chain.args.toTypedArray()
+                            args[0] = config.dockAlpha
+                            chain.proceed(args)
+                        } else {
+                            chain.proceed()
                         }
-                        chain.proceed()
                     }
                 }
         }
@@ -431,14 +434,15 @@ internal object LauncherExtendedFeatures {
                                 ?.resources
                                 ?.displayMetrics
                                 ?.density ?: 1f
-                            chain.args[0] = config.blurCornerDp * density
+                            val args = chain.args.toTypedArray()
+                            args[0] = config.blurCornerDp * density
+                            chain.proceed(args)
+                        } else {
+                            chain.proceed()
                         }
-                        chain.proceed()
                     }
                 }
         }
-
-        loadClass(loader, "com.android.launcher3.hotseAT.expand.ExpandConfig")
 
         loadClass(loader, "com.android.launcher3.hotseat.expand.ExpandConfig")?.let { cls ->
             cls.declaredMethods
