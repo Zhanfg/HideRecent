@@ -41,6 +41,9 @@ internal object LauncherExtendedFeatures {
         val disableIconSecondaryMenu: Boolean = false,
         val allowExcludedTaskLock: Boolean = false,
         val unlockTaskLockLimit: Boolean = false,
+        val removeShortcutBadge: Boolean = false,
+        val removeWorkBadge: Boolean = false,
+        val removeCloneBadge: Boolean = false,
 
         val dockAlphaEnabled: Boolean = false,
         val dockAlpha: Float = 1f,
@@ -56,7 +59,9 @@ internal object LauncherExtendedFeatures {
         val drawerGridEnabled: Boolean = false,
         val drawerColumns: Int = 4,
         val forceFoldMode: Boolean = false,
-        val foldMode: Int = 0
+        val foldMode: Int = 0,
+        val customIconSizeEnabled: Boolean = false,
+        val iconSizeDp: Int = 56
     )
 
     @Volatile private var config = Config()
@@ -106,6 +111,15 @@ internal object LauncherExtendedFeatures {
             unlockTaskLockLimit = prefs.getBoolean(
                 LauncherStabilityPrefs.KEY_UNLOCK_TASK_LOCK_LIMIT, false
             ),
+            removeShortcutBadge = prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_REMOVE_SHORTCUT_BADGE, false
+            ),
+            removeWorkBadge = prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_REMOVE_WORK_BADGE, false
+            ),
+            removeCloneBadge = prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_REMOVE_CLONE_BADGE, false
+            ),
 
             dockAlphaEnabled = prefs.getBoolean(
                 LauncherStabilityPrefs.KEY_DOCK_ALPHA_ENABLED, false
@@ -151,7 +165,13 @@ internal object LauncherExtendedFeatures {
             ),
             foldMode = prefs.getInt(
                 LauncherStabilityPrefs.KEY_FOLD_MODE, 0
-            ).coerceIn(0, 1)
+            ).coerceIn(0, 1),
+            customIconSizeEnabled = prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_CUSTOM_ICON_SIZE_ENABLED, false
+            ),
+            iconSizeDp = prefs.getInt(
+                LauncherStabilityPrefs.KEY_ICON_SIZE_DP, 56
+            ).coerceIn(36, 96)
         )
 
         applyLiveLayoutProfile()
@@ -179,6 +199,7 @@ internal object LauncherExtendedFeatures {
         count += hookFolderNameLimit(module, loader)
         count += hookSecondaryMenu(module, loader)
         count += hookTaskLock(module, loader)
+        count += hookIconAppearance(module, loader)
         count += hookDefaultHome(module, loader)
         count += hookLayoutProfile(module, loader)
 
@@ -563,6 +584,71 @@ internal object LauncherExtendedFeatures {
                     if (config.unlockTaskLockLimit) true else chain.proceed()
                 }
             }
+
+        return count
+    }
+
+    private fun hookIconAppearance(module: Main, loader: ClassLoader): Int {
+        var count = 0
+
+        loadClass(loader, "com.android.launcher3.BubbleTextView")?.let { cls ->
+            cls.declaredMethods
+                .filter {
+                    it.name == "getIconSize" &&
+                        it.parameterTypes.isEmpty() &&
+                        it.returnType == Int::class.javaPrimitiveType
+                }
+                .forEachIndexed { index, method ->
+                    count += hook(module, method, "icon/size/$index") { chain ->
+                        if (!config.customIconSizeEnabled) return@hook chain.proceed()
+                        val density = module.currentContext()
+                            ?.resources
+                            ?.displayMetrics
+                            ?.density ?: 1f
+                        (config.iconSizeDp * density).toInt()
+                    }
+                }
+        }
+
+        loadClass(loader, "com.android.launcher3.icons.BitmapInfo")?.let { cls ->
+            cls.declaredMethods
+                .filter {
+                    it.name == "applyFlags" &&
+                        it.returnType == Void.TYPE
+                }
+                .forEachIndexed { index, method ->
+                    count += hook(module, method, "icon/badge/$index") { chain ->
+                        if (!config.removeShortcutBadge &&
+                            !config.removeWorkBadge &&
+                            !config.removeCloneBadge
+                        ) {
+                            return@hook chain.proceed()
+                        }
+
+                        val host = chain.thisObject ?: return@hook chain.proceed()
+                        val flagsField = findField(host.javaClass, "flags")
+                        val badgeField = findField(host.javaClass, "badgeInfo")
+                        val oldFlags = runCatching { flagsField?.getInt(host) }.getOrNull()
+                        val oldBadge = runCatching { badgeField?.get(host) }.getOrNull()
+
+                        try {
+                            if (oldFlags != null) {
+                                var next = oldFlags
+                                if (config.removeWorkBadge) next = next and 1.inv()
+                                if (config.removeCloneBadge) next = next and 4.inv()
+                                flagsField?.setInt(host, next)
+                            }
+                            if (config.removeShortcutBadge && badgeField != null) {
+                                badgeField.set(host, null)
+                            }
+                            chain.proceed()
+                        } finally {
+                            if (oldFlags != null) runCatching { flagsField?.setInt(host, oldFlags) }
+                            if (badgeField != null) runCatching { badgeField.set(host, oldBadge) }
+                        }
+                    }
+                }
+        }
 
         return count
     }
