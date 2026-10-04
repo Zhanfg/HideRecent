@@ -194,6 +194,7 @@ object LauncherStabilityHook {
         installed += hookClearPanel(module, loader)
         installed += hookDesktopPresentation(module, loader)
         installed += hookHaptics(module, loader)
+        installed += LauncherExtendedFeatures.hook(module, loader)
 
         module.log(
             if (installed > 0) Log.INFO else Log.WARN,
@@ -213,6 +214,7 @@ object LauncherStabilityHook {
         remotePrefs = null
         prefsListener = null
         config = Config()
+        LauncherExtendedFeatures.reset()
         headers.clear()
         clearPanels.clear()
         bubbleLabels.clear()
@@ -291,6 +293,7 @@ object LauncherStabilityHook {
                 LauncherStabilityPrefs.KEY_HIDE_CLEAR_BUTTON, false
             )
         )
+        LauncherExtendedFeatures.refresh(prefs)
     }
 
     private fun hookTaskHeader(module: Main, loader: ClassLoader): Int {
