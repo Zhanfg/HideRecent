@@ -29,6 +29,11 @@ internal object LauncherPerformanceEngine {
         val decisiveFling: Boolean = false,
         val workspaceDragPaging: Boolean = false,
 
+        val oemAsyncTaskLaunch: Boolean = false,
+        val oemInterruptSpring: Boolean = false,
+        val oemAsyncSpringScroll: Boolean = false,
+        val oemSwipeHomeSpring: Boolean = false,
+
         val recentsSettleFloor: Float = 0.64f,
         val flingGain: Float = 1.10f,
         val dragPageMultiplier: Float = 0.72f
@@ -55,6 +60,19 @@ internal object LauncherPerformanceEngine {
             ),
             workspaceDragPaging = prefs.getBoolean(
                 LauncherStabilityPrefs.KEY_PERF_WORKSPACE_DRAG_PAGING, false
+            ),
+
+            oemAsyncTaskLaunch = prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_PERF_OEM_ASYNC_TASK_LAUNCH, false
+            ),
+            oemInterruptSpring = prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_PERF_OEM_INTERRUPT_SPRING, false
+            ),
+            oemAsyncSpringScroll = prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_PERF_OEM_ASYNC_SPRING_SCROLL, false
+            ),
+            oemSwipeHomeSpring = prefs.getBoolean(
+                LauncherStabilityPrefs.KEY_PERF_OEM_SWIPE_HOME_SPRING, false
             ),
 
             recentsSettleFloor = prefs.getFloat(
@@ -87,9 +105,84 @@ internal object LauncherPerformanceEngine {
 
     fun hook(module: Main, loader: ClassLoader): Int {
         var count = 0
+        count += hookOemNativePerformance(module, loader)
         count += hookRecents(module, loader)
         count += hookWorkspaceDrag(module, loader)
         module.log(Log.INFO, TAG, "performance hooks installed=$count")
+        return count
+    }
+
+    /**
+     * Prefer OPlus' own hidden performance paths before custom tuning.
+     *
+     * All five methods are zero-argument boolean feature gates in clean Launcher 17.3.12.
+     * Enabling them leaves implementation, interpolators, executors and lifecycle ownership
+     * entirely to the OEM code.
+     */
+    private fun hookOemNativePerformance(
+        module: Main,
+        loader: ClassLoader
+    ): Int {
+        val cls = loadClass(
+            loader,
+            "com.android.common.util.AppFeatureUtils"
+        ) ?: return 0
+
+        val forceTrue = mapOf(
+            "enableAsyncTaskViewLaunchWindowAnim" to
+                { config.oemAsyncTaskLaunch },
+            "enableTaskViewInterruptSpringAnim" to
+                { config.oemInterruptSpring },
+            "enableTaskWindowAsyncSpringScroll" to
+                { config.oemAsyncSpringScroll },
+            "isSupportRecentsSwipeUpWindowSpring" to
+                { config.oemSwipeHomeSpring }
+        )
+
+        var count = 0
+
+        cls.declaredMethods
+            .filter {
+                it.name in forceTrue.keys &&
+                    it.parameterTypes.isEmpty() &&
+                    it.returnType == Boolean::class.javaPrimitiveType
+            }
+            .forEachIndexed { index, method ->
+                val enabled = forceTrue.getValue(method.name)
+                count += hook(
+                    module,
+                    method,
+                    "oemNative/${method.name}/$index"
+                ) { chain ->
+                    if (config.enabled && enabled()) {
+                        true
+                    } else {
+                        chain.proceed()
+                    }
+                }
+            }
+
+        // Some builds expose a negative gate in addition to the positive support gate.
+        cls.declaredMethods
+            .filter {
+                it.name == "isRecentsSwipeUpWindowSpringDisable" &&
+                    it.parameterTypes.isEmpty() &&
+                    it.returnType == Boolean::class.javaPrimitiveType
+            }
+            .forEachIndexed { index, method ->
+                count += hook(
+                    module,
+                    method,
+                    "oemNative/swipeHomeSpringDisable/$index"
+                ) { chain ->
+                    if (config.enabled && config.oemSwipeHomeSpring) {
+                        false
+                    } else {
+                        chain.proceed()
+                    }
+                }
+            }
+
         return count
     }
 
