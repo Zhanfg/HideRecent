@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 配色直接取自 PackageViewer，保证视觉一致 -->
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
+    <!-- Fallback seed colors. Android 12+ devices are recolored through DynamicColors. -->
+    <color name="md_seed_primary">#4F5F8F</color>
+    <color name="md_seed_secondary">#5B5D72</color>
+    <color name="md_seed_tertiary">#75546F</color>
+
+    <!-- Legacy aliases retained for resources from the original project. -->
+    <color name="purple_200">#BBC7FF</color>
+    <color name="purple_500">#4F5F8F</color>
+    <color name="purple_700">#37476F</color>
+    <color name="teal_200">#A9D8D4</color>
+    <color name="teal_700">#386A66</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="text_primary">#757575</color>
-    <color name="bg_page">#F5F5F5</color>
-    <color name="bg_bottom_bar">#323232</color>
+    <color name="text_primary">#424654</color>
+    <color name="bg_page">#FFFBFF</color>
+    <color name="bg_bottom_bar">#E2E2EC</color>
 </resources>
