@@ -322,7 +322,7 @@ class LauncherStabilityActivity : AppCompatActivity() {
                     item.detail
                 )
             } else {
-                getString(R.string.pin_trace_detail_waiting)
+                pinTraceWaitingDetail(item.id)
             }
 
             textGroup.addView(
@@ -394,14 +394,38 @@ class LauncherStabilityActivity : AppCompatActivity() {
             when (id) {
                 PinTaskRuntimeTrace.STAGE_LAUNCHER ->
                     R.string.pin_trace_launcher
+                PinTaskRuntimeTrace.STAGE_SYSTEMUI_READY ->
+                    R.string.pin_trace_systemui_ready
+                PinTaskRuntimeTrace.STAGE_SYSTEMUI_INGRESS ->
+                    R.string.pin_trace_systemui_ingress
                 PinTaskRuntimeTrace.STAGE_SYSTEMUI ->
                     R.string.pin_trace_systemui
+                PinTaskRuntimeTrace.STAGE_SYSTEMUI_PLUGIN ->
+                    R.string.pin_trace_systemui_plugin
+                PinTaskRuntimeTrace.STAGE_ATHENA_READY ->
+                    R.string.pin_trace_athena_ready
+                PinTaskRuntimeTrace.STAGE_ATHENA_INGRESS ->
+                    R.string.pin_trace_athena_ingress
                 PinTaskRuntimeTrace.STAGE_ATHENA_LIST ->
                     R.string.pin_trace_athena_list
                 PinTaskRuntimeTrace.STAGE_ATHENA_MATCH ->
                     R.string.pin_trace_athena_match
                 else ->
                     R.string.chain_health_unknown
+            }
+        )
+
+    private fun pinTraceWaitingDetail(id: String): String =
+        getString(
+            when (id) {
+                PinTaskRuntimeTrace.STAGE_SYSTEMUI_READY ->
+                    R.string.pin_trace_wait_systemui_scope
+                PinTaskRuntimeTrace.STAGE_ATHENA_READY ->
+                    R.string.pin_trace_wait_athena_scope
+                PinTaskRuntimeTrace.STAGE_ATHENA_MATCH ->
+                    R.string.pin_trace_wait_athena_match
+                else ->
+                    R.string.pin_trace_detail_waiting
             }
         )
 
