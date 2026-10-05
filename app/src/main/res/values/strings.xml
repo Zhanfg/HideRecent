@@ -56,7 +56,7 @@
     <string name="hide_recents_dock">隐藏最近任务底部 Dock 图标</string>
     <string name="hide_recents_dock_desc">让最近任务 DockView 进入隐藏状态，不修改任务卡片本体。</string>
     <string name="restore_pin_capsule">恢复“钉到流体云”原生入口</string>
-    <string name="restore_pin_capsule_desc">恢复 ColorOS 17 原生 PinTask 门控；具体任务仍由 CapsuleManager.isTaskSupportPin 判定，钉住/取消继续走 oplus_pin_task / oplus_cancel_pin → SystemUI Seedling/LiveAlert。Framework 的 from_pin_task 会进入 mPinLockList，并与 recent-lock / float-lock 聚合后同步给 Athena；系统的 KeepAlive、Hans、OGuard 与启动策略会把 recent-lock 任务作为重要任务处理，包括提高进程 adj、清理优待和部分 service restart。它不是“永不被 LMK 杀”的绝对锁，因此本版不额外伪造强保活。</string>
+    <string name="restore_pin_capsule_desc">恢复 ColorOS 17 原生 PinTask 入口，并在 SystemUI 中补齐新版缺失的兼容路由：oplus_pin_task / oplus_cancel_pin → synthetic StatusBarNotification(oplus.pinTaskInfo) → sendLiveAlert / cancelLiveAlert。任务是否可钉仍由 Launcher 原生 isTaskSupportPin 判定；不会伪造强保活。</string>
     <string name="restore_floating_window_shortcut">恢复最近任务“小窗”原生入口</string>
     <string name="restore_floating_window_shortcut_desc">只恢复 AppFeatureUtils.isSupportFlexibleFloatingWindow 全局门控。ColorOS 17 原生 OplusTaskShortcutsFactory 仍会继续检查任务组件、displayId、分屏/单手模式以及应用自身小窗支持；真正打开小窗仍走 FlexibleWindowManager / OplusZoomWindowManager，不绕过兼容白名单。</string>
     <string name="recents_long_press_app_info">长按最近任务图标打开应用详情</string>
@@ -148,11 +148,11 @@
     <string name="perf_drag_page_multiplier">拖动跨页时长倍率</string>
 
     <string name="flex_bridge_title">小窗 / 分屏 Bridge</string>
-    <string name="flex_bridge_desc">独立作用于 SmartSidebar 与 OplusFlexibleWindowUI，不进入 system_server。保留 ColorOS 原生 OplusZoomWindowManager、FlexibleTaskController 与分屏状态机，只减少重复请求和同帧重复布局。</string>
+    <string name="flex_bridge_desc">只作用于 SmartSidebar 的小窗/分屏入口，不再注入 OplusFlexibleWindowUI。FlexibleTaskView、圆角、裁剪、SurfaceControl 与 system_server 状态机全部保持 ColorOS 原生。</string>
 
     <string name="flex_master_section">总开关</string>
     <string name="flex_bridge_enabled">启用 Flexible Window Bridge</string>
-    <string name="flex_bridge_enabled_desc">关闭时 SmartSidebar 与 com.oplus.pscanvas 中的桥接 Hook 全部保持原厂透传；不会改变应用小窗兼容白名单。</string>
+    <string name="flex_bridge_enabled_desc">关闭时 SmartSidebar 桥接 Hook 全部保持原厂透传；不会改变应用小窗兼容白名单，也不会触碰 pscanvas。</string>
 
     <string name="flex_sidebar_section">智能侧边栏</string>
     <string name="flex_zoom_debounce">过滤重复小窗启动请求</string>
