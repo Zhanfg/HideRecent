@@ -35,6 +35,7 @@ class Main : XposedModule() {
         const val LAUNCHER_PKG = "com.android.launcher"
         const val SMART_SIDEBAR_PKG = "com.coloros.smartsidebar"
         const val FLEXIBLE_WINDOW_UI_PKG = "com.oplus.pscanvas"
+        const val SYSTEMUI_PKG = "com.android.systemui"
 
         val DEFAULT_RECENTS_HOST_PKGS = setOf(
             LAUNCHER_PKG
@@ -86,8 +87,7 @@ class Main : XposedModule() {
                 log(Log.ERROR, TAG, "launcher stability hook failed", it)
             }
 
-            SMART_SIDEBAR_PKG,
-            FLEXIBLE_WINDOW_UI_PKG -> runCatching {
+            SMART_SIDEBAR_PKG -> runCatching {
                 FlexibleWindowBridge.hook(
                     this,
                     param.packageName,
@@ -97,7 +97,21 @@ class Main : XposedModule() {
                 log(
                     Log.ERROR,
                     TAG,
-                    "flexible-window bridge failed for " + param.packageName,
+                    "sidebar bridge failed for " + param.packageName,
+                    it
+                )
+            }
+
+            SYSTEMUI_PKG -> runCatching {
+                FluidCloudCompatBridge.hook(
+                    this,
+                    param.defaultClassLoader
+                )
+            }.onFailure {
+                log(
+                    Log.ERROR,
+                    TAG,
+                    "fluid-cloud compat bridge failed",
                     it
                 )
             }
@@ -108,6 +122,7 @@ class Main : XposedModule() {
         param.setSavedInstanceState("")
         LauncherStabilityHook.prepareHotReload()
         FlexibleWindowBridge.prepareHotReload()
+        FluidCloudCompatBridge.prepareHotReload()
         return true
     }
 
@@ -129,8 +144,7 @@ class Main : XposedModule() {
                 log(Log.ERROR, TAG, "hot reload launcher rehook failed", it)
             }
 
-            SMART_SIDEBAR_PKG,
-            FLEXIBLE_WINDOW_UI_PKG -> runCatching {
+            SMART_SIDEBAR_PKG -> runCatching {
                 FlexibleWindowBridge.hook(
                     this,
                     processPackage,
@@ -140,7 +154,21 @@ class Main : XposedModule() {
                 log(
                     Log.ERROR,
                     TAG,
-                    "hot reload flexible-window rehook failed",
+                    "hot reload sidebar rehook failed",
+                    it
+                )
+            }
+
+            SYSTEMUI_PKG -> runCatching {
+                FluidCloudCompatBridge.hook(
+                    this,
+                    loader
+                )
+            }.onFailure {
+                log(
+                    Log.ERROR,
+                    TAG,
+                    "hot reload fluid-cloud rehook failed",
                     it
                 )
             }
