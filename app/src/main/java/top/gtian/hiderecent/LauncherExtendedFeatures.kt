@@ -644,6 +644,17 @@ internal object LauncherExtendedFeatures {
                     try {
                         val result = chain.proceed()
 
+                        PinTaskRuntimeTraceReporter.record(
+                            context = module.currentContext(),
+                            stage = PinTaskRuntimeTrace.STAGE_LAUNCHER,
+                            taskId = info.taskId ?: -1,
+                            packageName = info.packageName,
+                            detail = method.name +
+                                " dispatched; expectedPinned=" +
+                                info.expectedPinned,
+                            reset = true
+                        )
+
                         if (target != null && info.taskId != null) {
                             schedulePinStateProbe(
                                 module = module,
@@ -756,6 +767,15 @@ internal object LauncherExtendedFeatures {
                     "PinTask state confirmed taskId=$taskId " +
                         "pinned=$pinned expected=${info.expectedPinned} " +
                         "pkg=${info.packageName} hansFrozen=$hansFrozen"
+                )
+
+                PinTaskRuntimeTraceReporter.record(
+                    context = module.currentContext(),
+                    stage = PinTaskRuntimeTrace.STAGE_LAUNCHER,
+                    taskId = taskId,
+                    packageName = info.packageName,
+                    detail = "Capsule state confirmed pinned=$pinned " +
+                        "expected=${info.expectedPinned}; hansFrozen=$hansFrozen"
                 )
                 return@postDelayed
             }
