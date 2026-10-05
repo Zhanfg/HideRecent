@@ -409,7 +409,7 @@ internal object FluidCloudCompatBridge {
             pid,
             0,
             notification,
-            UserHandle.of(userId),
+            resolveUserHandle(userId),
             System.currentTimeMillis()
         )
 
@@ -423,6 +423,17 @@ internal object FluidCloudCompatBridge {
             putParcelable(KEY_CONTENT, sbn)
         }
     }
+
+    private fun resolveUserHandle(userId: Int): UserHandle =
+        runCatching {
+            val method = UserHandle::class.java.getMethod(
+                "of",
+                Int::class.javaPrimitiveType
+            )
+            method.invoke(null, userId) as UserHandle
+        }.getOrElse {
+            android.os.Process.myUserHandle()
+        }
 
     private fun buildUnpinTranslation(
         module: Main,
