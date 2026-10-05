@@ -490,33 +490,70 @@ internal object LauncherExtendedFeatures {
      * still decides per task/app support, and stock pinToCapsule()/unpinCapsule() continue
      * to call the SystemUI Seedling provider.
      */
-    private fun hookPinCapsuleGate(module: Main, loader: ClassLoader): Int {
-        val cls = loadClass(loader, "com.android.common.util.AppFeatureUtils")
-            ?: return 0
-
+    private fun hookPinCapsuleGate(
+        module: Main,
+        loader: ClassLoader
+    ): Int {
         var count = 0
-        cls.declaredMethods
-            .filter {
-                it.name == "isSupportPinCapsule" &&
-                    it.parameterTypes.isEmpty() &&
-                    it.returnType == Boolean::class.javaPrimitiveType
-            }
-            .forEachIndexed { index, method ->
-                count += hook(
-                    module,
-                    method,
-                    "capsule/supportGate/$index"
-                ) { chain ->
-                    if (
-                        config.restorePinCapsule &&
-                        isFluidCloudDownstreamAvailable(module)
-                    ) {
-                        true
-                    } else {
-                        chain.proceed()
+
+        // Launcher-local helper used by the recent-task UI.
+        loadClass(
+            loader,
+            "com.android.common.util.AppFeatureUtils"
+        )?.let { cls ->
+            cls.declaredMethods
+                .filter {
+                    it.name == "isSupportPinCapsule" &&
+                        it.parameterTypes.isEmpty() &&
+                        it.returnType == Boolean::class.javaPrimitiveType
+                }
+                .forEachIndexed { index, method ->
+                    count += hook(
+                        module,
+                        method,
+                        "capsule/supportGate/$index"
+                    ) { chain ->
+                        if (config.restorePinCapsule) {
+                            true
+                        } else {
+                            chain.proceed()
+                        }
                     }
                 }
-            }
+        }
+
+        // Match LuckyTool's actual ColorOS 17 gate so code below AppFeatureUtils
+        // sees the same feature state as SystemUIPlugin.
+        loadClass(
+            loader,
+            "com.oplus.content.OplusFeatureConfigManager"
+        )?.let { cls ->
+            cls.declaredMethods
+                .filter {
+                    it.name == "hasFeature" &&
+                        it.parameterTypes.contentEquals(
+                            arrayOf(String::class.java)
+                        ) &&
+                        it.returnType == Boolean::class.javaPrimitiveType
+                }
+                .forEachIndexed { index, method ->
+                    count += hook(
+                        module,
+                        method,
+                        "capsule/featureGate/$index"
+                    ) { chain ->
+                        val key =
+                            chain.args.firstOrNull() as? String
+                        if (config.restorePinCapsule &&
+                            key == "oplus.software.systemui.pin_task"
+                        ) {
+                            true
+                        } else {
+                            chain.proceed()
+                        }
+                    }
+                }
+        }
 
         return count
     }
