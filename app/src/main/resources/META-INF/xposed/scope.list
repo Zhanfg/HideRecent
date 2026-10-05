@@ -1,5 +1,6 @@
-# ColorOS 17 launcher + isolated flexible-window UI processes.
-# system_server and SystemUI remain deliberately out of scope.
+# ColorOS 17 launcher + isolated sidebar/SystemUI compatibility bridges.
+# pscanvas is intentionally not hooked: FlexibleTaskView.resize() carries
+# crop/corner side effects and must stay 100% OEM.
 com.android.launcher
 com.coloros.smartsidebar
-com.oplus.pscanvas
+com.android.systemui
