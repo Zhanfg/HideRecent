@@ -22,9 +22,29 @@ object PinTaskRuntimeTrace {
     private const val PREFS = "pin_task_runtime_trace"
 
     const val STAGE_LAUNCHER = "launcher"
+    const val STAGE_SYSTEMUI_READY = "systemui_ready"
+    const val STAGE_SYSTEMUI_INGRESS = "systemui_ingress"
     const val STAGE_SYSTEMUI = "systemui"
+    const val STAGE_SYSTEMUI_PLUGIN = "systemui_plugin"
+    const val STAGE_ATHENA_READY = "athena_ready"
+    const val STAGE_ATHENA_INGRESS = "athena_ingress"
     const val STAGE_ATHENA_LIST = "athena_list"
     const val STAGE_ATHENA_MATCH = "athena_match"
+
+    private val READY_STAGES = setOf(
+        STAGE_SYSTEMUI_READY,
+        STAGE_ATHENA_READY
+    )
+
+    private val ACTION_STAGES = setOf(
+        STAGE_LAUNCHER,
+        STAGE_SYSTEMUI_INGRESS,
+        STAGE_SYSTEMUI,
+        STAGE_SYSTEMUI_PLUGIN,
+        STAGE_ATHENA_INGRESS,
+        STAGE_ATHENA_LIST,
+        STAGE_ATHENA_MATCH
+    )
 
     data class Item(
         val id: String,
@@ -57,7 +77,12 @@ object PinTaskRuntimeTrace {
         return Snapshot(
             listOf(
                 item(STAGE_LAUNCHER),
+                item(STAGE_SYSTEMUI_READY),
+                item(STAGE_SYSTEMUI_INGRESS),
                 item(STAGE_SYSTEMUI),
+                item(STAGE_SYSTEMUI_PLUGIN),
+                item(STAGE_ATHENA_READY),
+                item(STAGE_ATHENA_INGRESS),
                 item(STAGE_ATHENA_LIST),
                 item(STAGE_ATHENA_MATCH)
             )
@@ -74,7 +99,17 @@ object PinTaskRuntimeTrace {
     ) {
         val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val e = p.edit()
-        if (reset) e.clear()
+        if (reset) {
+            // A new Launcher Pin action should reset only action traces.
+            // Keep READY markers so the UI can still prove that SystemUI/Athena
+            // are actually injected after each test.
+            ACTION_STAGES.forEach { action ->
+                e.remove("${action}_at")
+                e.remove("${action}_task")
+                e.remove("${action}_pkg")
+                e.remove("${action}_detail")
+            }
+        }
         e.putLong("${stage}_at", System.currentTimeMillis())
         e.putInt("${stage}_task", taskId)
         if (packageName != null) {
@@ -113,7 +148,12 @@ class PinTaskRuntimeTraceProvider : ContentProvider() {
         val stage = extras?.getString("stage").orEmpty()
         if (stage !in setOf(
                 PinTaskRuntimeTrace.STAGE_LAUNCHER,
+                PinTaskRuntimeTrace.STAGE_SYSTEMUI_READY,
+                PinTaskRuntimeTrace.STAGE_SYSTEMUI_INGRESS,
                 PinTaskRuntimeTrace.STAGE_SYSTEMUI,
+                PinTaskRuntimeTrace.STAGE_SYSTEMUI_PLUGIN,
+                PinTaskRuntimeTrace.STAGE_ATHENA_READY,
+                PinTaskRuntimeTrace.STAGE_ATHENA_INGRESS,
                 PinTaskRuntimeTrace.STAGE_ATHENA_LIST,
                 PinTaskRuntimeTrace.STAGE_ATHENA_MATCH
             )
