@@ -10,6 +10,21 @@
     <string name="use_dynamic_color">使用系统动态取色</string>
     <string name="use_dynamic_color_desc">默认关闭，使用接近 LuckyTool 的经典 Material 3 紫灰色板；开启后才跟随系统壁纸动态取色。</string>
 
+    <string name="chain_health_title">ColorOS 任务链健康检查</string>
+    <string name="chain_health_desc">只读检查小窗、分屏、流体云和任务保活相关的系统组件。恢复“钉到流体云”或“小窗”入口前也会使用同一套下游预检，缺组件时保持系统原值。</string>
+    <string name="chain_health_summary_ok">关键链路正常 · %1$d/%2$d 个组件可用</string>
+    <string name="chain_health_summary_partial">检测到链路缺口 · %1$d/%2$d 个组件可用</string>
+    <string name="chain_health_available">可用</string>
+    <string name="chain_health_missing">缺失</string>
+    <string name="chain_health_refresh">重新检测</string>
+    <string name="chain_health_fluid_cloud">流体云 / SystemUI Seedling Provider</string>
+    <string name="chain_health_flexible_ui">Flexible Window UI / pscanvas</string>
+    <string name="chain_health_smart_sidebar">智能侧边栏 / SmartSidebar</string>
+    <string name="chain_health_seedling">Seedling Service / SecurityPermission</string>
+    <string name="chain_health_pantanal">Pantanal UMS</string>
+    <string name="chain_health_athena">Athena / Hans / recent-lock</string>
+    <string name="chain_health_unknown">未知组件</string>
+
     <string name="haptic_card_title">触觉反馈</string>
     <string name="recents_display_title">最近任务显示</string>
 
