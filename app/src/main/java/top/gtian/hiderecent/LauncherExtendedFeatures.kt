@@ -75,6 +75,8 @@ internal object LauncherExtendedFeatures {
     @Volatile private var config = Config()
     @Volatile private var module: Main? = null
     @Volatile private var loader: ClassLoader? = null
+    @Volatile private var fluidCloudDownstreamAvailable: Boolean? = null
+    @Volatile private var flexibleWindowUiAvailable: Boolean? = null
 
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
 
@@ -214,6 +216,8 @@ internal object LauncherExtendedFeatures {
         config = Config()
         module = null
         loader = null
+        fluidCloudDownstreamAvailable = null
+        flexibleWindowUiAvailable = null
         recentsLongClickWraps.clear()
     }
 
@@ -503,7 +507,14 @@ internal object LauncherExtendedFeatures {
                     method,
                     "capsule/supportGate/$index"
                 ) { chain ->
-                    if (config.restorePinCapsule) true else chain.proceed()
+                    if (
+                        config.restorePinCapsule &&
+                        isFluidCloudDownstreamAvailable(module)
+                    ) {
+                        true
+                    } else {
+                        chain.proceed()
+                    }
                 }
             }
 
@@ -534,7 +545,10 @@ internal object LauncherExtendedFeatures {
                     method,
                     "floatingWindow/supportGate/$index"
                 ) { chain ->
-                    if (config.restoreFloatingWindowShortcut) {
+                    if (
+                        config.restoreFloatingWindowShortcut &&
+                        isFlexibleWindowUiAvailable(module)
+                    ) {
                         true
                     } else {
                         chain.proceed()
@@ -543,6 +557,42 @@ internal object LauncherExtendedFeatures {
             }
 
         return count
+    }
+
+    private fun isFluidCloudDownstreamAvailable(
+        module: Main
+    ): Boolean {
+        fluidCloudDownstreamAvailable?.let { return it }
+
+        val context = module.currentContext() ?: return false
+        val available =
+            ColorOSChainHealth.isFluidCloudDownstreamAvailable(context)
+        fluidCloudDownstreamAvailable = available
+
+        module.log(
+            if (available) Log.INFO else Log.WARN,
+            TAG,
+            "Fluid Cloud downstream preflight available=$available"
+        )
+        return available
+    }
+
+    private fun isFlexibleWindowUiAvailable(
+        module: Main
+    ): Boolean {
+        flexibleWindowUiAvailable?.let { return it }
+
+        val context = module.currentContext() ?: return false
+        val available =
+            ColorOSChainHealth.isFlexibleWindowUiAvailable(context)
+        flexibleWindowUiAvailable = available
+
+        module.log(
+            if (available) Log.INFO else Log.WARN,
+            TAG,
+            "FlexibleWindowUI preflight available=$available"
+        )
+        return available
     }
 
     /**
