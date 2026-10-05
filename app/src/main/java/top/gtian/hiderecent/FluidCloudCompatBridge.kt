@@ -600,8 +600,8 @@ internal object FluidCloudCompatBridge {
             // getField() already walks public inherited fields, including TaskInfo.userId.
             val field = taskInfo.javaClass.getField("userId")
             (field.get(taskInfo) as? Number)?.toInt()
-                ?: UserHandle.myUserId()
-        }.getOrDefault(UserHandle.myUserId())
+                ?: android.os.Process.myUserHandle().identifier
+        }.getOrDefault(android.os.Process.myUserHandle().identifier)
 
     private fun resolvePackageUidForUser(
         context: Context,
