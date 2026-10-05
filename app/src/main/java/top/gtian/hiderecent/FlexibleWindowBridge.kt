@@ -17,10 +17,11 @@ import java.util.concurrent.atomic.AtomicInteger
  * IMPORTANT:
  * FlexibleTaskView / pscanvas is intentionally untouched.
  *
- * ColorOS FlexibleTaskView.resize(Rect) is not a pure geometry setter: the OEM path also
- * participates in crop/corner-radius/SurfaceControl synchronization. Skipping an apparently
- * duplicate Rect can therefore leave a task with stale square corners. This bridge now only
- * filters accidental duplicate *entry requests* in SmartSidebar.
+ * ColorOS Flexible Window startup is multi-stage. Repeated entry calls may participate in
+ * policy/crop/corner synchronization, so this bridge must never suppress an OEM request.
+ *
+ * The former debounce controls are retained only for low-frequency diagnostics and always
+ * pass through to the original SmartSidebar implementation.
  */
 internal object FlexibleWindowBridge {
     private const val TAG = "${Main.TAG}/flex"
@@ -202,34 +203,33 @@ internal object FlexibleWindowBridge {
                         method,
                         "sidebar/zoom/$index"
                     ) { chain ->
-                        if (!config.enabled ||
-                            !config.zoomDebounce
-                        ) {
-                            return@hook chain.proceed()
-                        }
-
-                        val intent = chain.args
-                            .firstOrNull { it is Intent } as? Intent
-                            ?: return@hook chain.proceed()
-
-                        val key = zoomRequestKey(intent)
-                        val now = SystemClock.uptimeMillis()
-
-                        synchronized(this) {
-                            val previous = lastZoomKey
-                            val delta = now - lastZoomAt
-
-                            if (key == previous &&
-                                delta >= 0L &&
-                                delta < config.zoomDebounceMs
-                            ) {
-                                return@hook null
+                        if (config.enabled && config.zoomDebounce) {
+                            val intent = chain.args
+                                .firstOrNull { it is Intent } as? Intent
+                            if (intent != null) {
+                                val key = zoomRequestKey(intent)
+                                val now = SystemClock.uptimeMillis()
+                                synchronized(this) {
+                                    val previous = lastZoomKey
+                                    val delta = now - lastZoomAt
+                                    if (key == previous &&
+                                        delta >= 0L &&
+                                        delta < config.zoomDebounceMs
+                                    ) {
+                                        module.log(
+                                            Log.INFO,
+                                            TAG,
+                                            "duplicate zoom request observed delta=${delta}ms; OEM call preserved"
+                                        )
+                                    }
+                                    lastZoomKey = key
+                                    lastZoomAt = now
+                                }
                             }
-
-                            lastZoomKey = key
-                            lastZoomAt = now
                         }
 
+                        // Correctness first: never consume a zoom-window request. Later OEM
+                        // stages can carry crop/corner/finalization side effects.
                         chain.proceed()
                     }
                 }
@@ -250,29 +250,30 @@ internal object FlexibleWindowBridge {
                         method,
                         "sidebar/split/$index"
                     ) { chain ->
-                        if (!config.enabled ||
-                            !config.splitDebounce
-                        ) {
-                            return@hook chain.proceed()
-                        }
-
-                        val host = chain.thisObject
-                            ?: return@hook chain.proceed()
-                        val now = SystemClock.uptimeMillis()
-
-                        synchronized(splitStartAt) {
-                            val previous = splitStartAt[host]
-                            if (previous != null) {
-                                val delta = now - previous
-                                if (delta >= 0L &&
-                                    delta < config.splitDebounceMs
-                                ) {
-                                    return@hook null
+                        if (config.enabled && config.splitDebounce) {
+                            val host = chain.thisObject
+                            if (host != null) {
+                                val now = SystemClock.uptimeMillis()
+                                synchronized(splitStartAt) {
+                                    val previous = splitStartAt[host]
+                                    if (previous != null) {
+                                        val delta = now - previous
+                                        if (delta >= 0L &&
+                                            delta < config.splitDebounceMs
+                                        ) {
+                                            module.log(
+                                                Log.INFO,
+                                                TAG,
+                                                "duplicate split request observed delta=${delta}ms; OEM call preserved"
+                                            )
+                                        }
+                                    }
+                                    splitStartAt[host] = now
                                 }
                             }
-                            splitStartAt[host] = now
                         }
 
+                        // Same policy as zoom: observe duplicates, never suppress OEM state flow.
                         chain.proceed()
                     }
                 }
