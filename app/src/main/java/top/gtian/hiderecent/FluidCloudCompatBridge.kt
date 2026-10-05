@@ -409,7 +409,7 @@ internal object FluidCloudCompatBridge {
             pid,
             0,
             notification,
-            UserHandle(userId),
+            UserHandle.of(userId),
             System.currentTimeMillis()
         )
 
