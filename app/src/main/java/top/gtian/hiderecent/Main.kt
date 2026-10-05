@@ -34,7 +34,6 @@ class Main : XposedModule() {
 
         const val LAUNCHER_PKG = "com.android.launcher"
         const val SMART_SIDEBAR_PKG = "com.coloros.smartsidebar"
-        const val FLEXIBLE_WINDOW_UI_PKG = "com.oplus.pscanvas"
         const val SYSTEMUI_PKG = "com.android.systemui"
 
         val DEFAULT_RECENTS_HOST_PKGS = setOf(
