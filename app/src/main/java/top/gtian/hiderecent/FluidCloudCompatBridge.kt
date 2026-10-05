@@ -2,6 +2,7 @@ package top.gtian.hiderecent
 
 import android.app.ActivityManager
 import android.app.Notification
+import android.app.TaskInfo
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -500,11 +501,10 @@ internal object FluidCloudCompatBridge {
             context.getSystemService(ActivityManager::class.java)
                 ?: return null
 
-        @Suppress("DEPRECATION")
-        val taskInfo = runCatching {
-            activityManager.getRunningTasks(128)
-                .firstOrNull { it.id == taskId }
-        }.getOrNull() ?: return null
+        val taskInfo = findTaskInfo(
+            activityManager = activityManager,
+            taskId = taskId
+        ) ?: return null
 
         val packageName =
             taskInfo.baseActivity?.packageName
@@ -517,7 +517,7 @@ internal object FluidCloudCompatBridge {
             context = context,
             packageName = packageName,
             userId = userId
-        )
+        ).takeIf { it >= 0 } ?: return null
         val label = resolveAppLabel(context, packageName)
 
         val pinInfo = Bundle(legacy).apply {
@@ -572,14 +572,33 @@ internal object FluidCloudCompatBridge {
         )
     }
 
+    @Suppress("DEPRECATION")
+    private fun findTaskInfo(
+        activityManager: ActivityManager,
+        taskId: Int
+    ): TaskInfo? {
+        val running = runCatching {
+            activityManager.getRunningTasks(128)
+                .firstOrNull { it.taskId == taskId }
+        }.getOrNull()
+        if (running != null) return running
+
+        // A pinned task may have left the currently-running set while still being present in
+        // Recents. SystemUI is privileged, so use the read-only recent-task list as fallback.
+        return runCatching {
+            activityManager.getRecentTasks(
+                128,
+                ActivityManager.RECENT_WITH_EXCLUDED
+            ).firstOrNull { it.taskId == taskId }
+        }.getOrNull()
+    }
+
     private fun readTaskUserId(
-        taskInfo: ActivityManager.RunningTaskInfo
+        taskInfo: TaskInfo
     ): Int =
         runCatching {
-            val field = taskInfo.javaClass
-                .superclass
-                ?.getField("userId")
-                ?: taskInfo.javaClass.getField("userId")
+            // getField() already walks public inherited fields, including TaskInfo.userId.
+            val field = taskInfo.javaClass.getField("userId")
             (field.get(taskInfo) as? Number)?.toInt()
                 ?: UserHandle.myUserId()
         }.getOrDefault(UserHandle.myUserId())
