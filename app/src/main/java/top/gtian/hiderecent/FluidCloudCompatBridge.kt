@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.drawable.Icon
+import android.os.Binder
 import android.os.Bundle
 import android.os.SystemClock
 import android.os.UserHandle
@@ -301,8 +302,25 @@ internal object FluidCloudCompatBridge {
                             "taskId=${legacyExtras.getInt("taskId", -1)}"
                     )
 
-                    val result = chain.proceed(args) as? Bundle
+                    // SeedlingCardServerProvider validates Binder.getCallingUid()
+                    // against its allowed package list before dispatching sendLiveAlert.
+                    // The legacy call originates from Launcher, but after translation we are
+                    // forwarding inside SystemUI. Clear only this call's inbound identity so
+                    // the downstream plugin sees the local SystemUI identity, then restore it.
+                    val originalCallingUid = Binder.getCallingUid()
+                    val identityToken = Binder.clearCallingIdentity()
+                    val result = try {
+                        chain.proceed(args) as? Bundle
+                    } finally {
+                        Binder.restoreCallingIdentity(identityToken)
+                    }
                     val resultCode = result?.getInt(KEY_RESULT, 0) ?: 0
+
+                    module.log(
+                        Log.INFO,
+                        TAG,
+                        "translated callerUid=$originalCallingUid localUid=${android.os.Process.myUid()}"
+                    )
 
                     module.log(
                         if (resultCode != 0) Log.INFO else Log.WARN,
@@ -439,10 +457,8 @@ internal object FluidCloudCompatBridge {
             packageName
         )
 
-        return Notification.Builder(
-            context,
-            "launcher_pin_task_compat"
-        )
+        @Suppress("DEPRECATION")
+        return Notification.Builder(context)
             .setSmallIcon(icon)
             .setContentTitle(title)
             .setContentText(title)
