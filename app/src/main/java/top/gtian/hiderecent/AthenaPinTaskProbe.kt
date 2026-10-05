@@ -55,6 +55,12 @@ internal object AthenaPinTaskProbe {
             "Athena PinTask probe installed hooks=$count"
         )
 
+        reportReadyAsync(
+            module = module,
+            expectedGeneration = expectedGeneration,
+            hookCount = count
+        )
+
         Thread({
             bootstrapPrefs(module, expectedGeneration)
         }, "LauncherStabilityAthenaPrefs").apply {
@@ -81,6 +87,32 @@ internal object AthenaPinTaskProbe {
         config = Config()
         positiveLogCount.set(0L)
         lastMatchTraceAt.set(0L)
+    }
+
+    private fun reportReadyAsync(
+        module: Main,
+        expectedGeneration: Int,
+        hookCount: Int
+    ) {
+        Thread({
+            repeat(24) {
+                if (generation.get() != expectedGeneration) return@Thread
+                val context = module.currentContext()
+                if (context != null) {
+                    PinTaskRuntimeTraceReporter.record(
+                        context = context,
+                        stage = PinTaskRuntimeTrace.STAGE_ATHENA_READY,
+                        detail = "Athena injected; hooks=" + hookCount
+                    )
+                    return@Thread
+                }
+                SystemClock.sleep(250L)
+            }
+        }, "LauncherStabilityAthenaReady").apply {
+            isDaemon = true
+            priority = Thread.NORM_PRIORITY - 1
+            start()
+        }
     }
 
     private fun bootstrapPrefs(
