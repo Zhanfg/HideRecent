@@ -38,6 +38,7 @@ internal object AthenaPinTaskProbe {
     private val bootstrapStarted = AtomicBoolean(false)
     private val generation = AtomicInteger(0)
     private val positiveLogCount = AtomicLong(0)
+    private val lastMatchTraceAt = AtomicLong(0L)
 
     fun hook(
         module: Main,
@@ -78,6 +79,7 @@ internal object AthenaPinTaskProbe {
         prefsListener = null
         config = Config()
         positiveLogCount.set(0L)
+        lastMatchTraceAt.set(0L)
     }
 
     private fun bootstrapPrefs(
@@ -188,6 +190,14 @@ internal object AthenaPinTaskProbe {
                             "Athena pin lock list updated user=$userId " +
                                 "count=${list?.size ?: -1}"
                         )
+
+                        PinTaskRuntimeTraceReporter.record(
+                            context = module.currentContext(),
+                            stage = PinTaskRuntimeTrace.STAGE_ATHENA_LIST,
+                            detail = "pin lock list updated; user=" +
+                                userId + "; count=" +
+                                (list?.size ?: -1)
+                        )
                     }
 
                     result
@@ -224,6 +234,19 @@ internal object AthenaPinTaskProbe {
                                 "Athena isPinTask=true arg0=$first arg1=$second; " +
                                     "OEM result preserved"
                             )
+
+                            val now = SystemClock.elapsedRealtime()
+                            val previous = lastMatchTraceAt.get()
+                            if (now - previous >= 750L &&
+                                lastMatchTraceAt.compareAndSet(previous, now)
+                            ) {
+                                PinTaskRuntimeTraceReporter.record(
+                                    context = module.currentContext(),
+                                    stage = PinTaskRuntimeTrace.STAGE_ATHENA_MATCH,
+                                    detail = "isPinTask=true; rawArg0=" +
+                                        first + "; rawArg1=" + second
+                                )
+                            }
                         }
                     }
 
