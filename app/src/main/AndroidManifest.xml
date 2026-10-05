@@ -3,6 +3,17 @@
 
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <queries>
+        <package android:name="com.android.systemui" />
+        <package android:name="com.oplus.pscanvas" />
+        <package android:name="com.coloros.smartsidebar" />
+        <package android:name="com.oplus.securitypermission" />
+        <package android:name="com.oplus.pantanal.ums" />
+        <package android:name="com.oplus.athena" />
+        <provider android:authorities="com.oplus.card.server.systemui.provider" />
+        <provider android:authorities="com.oplusos.provider.SeedlingServiceProvider" />
+    </queries>
+
     <application
         android:name=".LauncherStabilityApplication"
         android:icon="@mipmap/ic_launcher"
