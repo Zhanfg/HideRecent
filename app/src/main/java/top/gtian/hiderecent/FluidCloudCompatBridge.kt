@@ -342,6 +342,19 @@ internal object FluidCloudCompatBridge {
 
                     val taskId =
                         legacyExtras.getInt("taskId", -1)
+                    val packageName =
+                        legacyExtras.getString("packageName")
+
+                    PinTaskRuntimeTraceReporter.record(
+                        context = module.currentContext(),
+                        stage = PinTaskRuntimeTrace.STAGE_SYSTEMUI,
+                        taskId = taskId,
+                        packageName = packageName,
+                        detail = legacyMethod +
+                            " -> " + transformed.first +
+                            "; resultCode=" + resultCode +
+                            "; success=" + (resultCode != 0)
+                    )
 
                     if (legacyMethod == METHOD_PIN) {
                         if (resultCode == 0 && taskId >= 0) {
