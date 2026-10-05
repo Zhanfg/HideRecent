@@ -2,7 +2,6 @@ package top.gtian.hiderecent
 
 import android.content.Intent
 import android.content.SharedPreferences
-import android.graphics.Rect
 import android.os.SystemClock
 import android.util.Log
 import io.github.libxposed.api.XposedInterface
@@ -13,14 +12,15 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * ColorOS 17 Flexible Window bridge.
+ * ColorOS 17 SmartSidebar request bridge.
  *
- * Process isolation:
- * - com.coloros.smartsidebar: entry-point request de-duplication only.
- * - com.oplus.pscanvas: same-frame FlexibleTaskView.resize(Rect) de-duplication only.
+ * IMPORTANT:
+ * FlexibleTaskView / pscanvas is intentionally untouched.
  *
- * It intentionally does NOT inject into system_server and does NOT bypass OEM
- * compatibility/whitelist decisions. All functionality is default-off and fail-open.
+ * ColorOS FlexibleTaskView.resize(Rect) is not a pure geometry setter: the OEM path also
+ * participates in crop/corner-radius/SurfaceControl synchronization. Skipping an apparently
+ * duplicate Rect can therefore leave a task with stale square corners. This bridge now only
+ * filters accidental duplicate *entry requests* in SmartSidebar.
  */
 internal object FlexibleWindowBridge {
     private const val TAG = "${Main.TAG}/flex"
@@ -31,20 +31,14 @@ internal object FlexibleWindowBridge {
         val enabled: Boolean = false,
         val zoomDebounce: Boolean = false,
         val splitDebounce: Boolean = false,
-        val resizeDedup: Boolean = false,
         val zoomDebounceMs: Int = 220,
-        val splitDebounceMs: Int = 280,
-        val resizeDedupMs: Int = 16
-    )
-
-    private data class ResizeStamp(
-        val rect: Rect,
-        val at: Long
+        val splitDebounceMs: Int = 280
     )
 
     @Volatile private var config = Config()
     @Volatile private var remotePrefs: SharedPreferences? = null
-    @Volatile private var prefsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
+    @Volatile private var prefsListener:
+        SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     private val bootstrapStarted = AtomicBoolean(false)
     private val generation = AtomicInteger(0)
@@ -55,33 +49,27 @@ internal object FlexibleWindowBridge {
     private val splitStartAt = Collections.synchronizedMap(
         WeakHashMap<Any, Long>()
     )
-    private val resizeStamps = Collections.synchronizedMap(
-        WeakHashMap<Any, ResizeStamp>()
-    )
 
     fun hook(
         module: Main,
         packageName: String,
         loader: ClassLoader
     ) {
+        if (packageName != Main.SMART_SIDEBAR_PKG) return
         if (!bootstrapStarted.compareAndSet(false, true)) return
-        val currentGeneration = generation.incrementAndGet()
 
-        val count = when (packageName) {
-            Main.SMART_SIDEBAR_PKG -> hookSmartSidebar(module, loader)
-            Main.FLEXIBLE_WINDOW_UI_PKG -> hookFlexibleUi(module, loader)
-            else -> 0
-        }
+        val currentGeneration = generation.incrementAndGet()
+        val count = hookSmartSidebar(module, loader)
 
         module.log(
             if (count > 0) Log.INFO else Log.WARN,
             TAG,
-            "bridge skeleton installed package=$packageName hooks=$count"
+            "SmartSidebar bridge skeleton installed hooks=$count"
         )
 
         Thread({
             bootstrapPrefs(module, currentGeneration)
-        }, "LauncherStabilityFlexPrefs").apply {
+        }, "LauncherStabilitySidebarPrefs").apply {
             isDaemon = true
             priority = Thread.NORM_PRIORITY - 1
             start()
@@ -107,10 +95,12 @@ internal object FlexibleWindowBridge {
         lastZoomKey = null
         lastZoomAt = 0L
         splitStartAt.clear()
-        resizeStamps.clear()
     }
 
-    private fun bootstrapPrefs(module: Main, expectedGeneration: Int) {
+    private fun bootstrapPrefs(
+        module: Main,
+        expectedGeneration: Int
+    ) {
         SystemClock.sleep(750L)
 
         for (attempt in 1..PREF_MAX_ATTEMPTS) {
@@ -123,8 +113,12 @@ internal object FlexibleWindowBridge {
                 refresh(prefs)
 
                 val listener =
-                    SharedPreferences.OnSharedPreferenceChangeListener { changed, key ->
-                        if (key == null || key in LauncherStabilityPrefs.ALL_KEYS) {
+                    SharedPreferences.OnSharedPreferenceChangeListener {
+                            changed,
+                            key ->
+                        if (key == null ||
+                            key in LauncherStabilityPrefs.ALL_KEYS
+                        ) {
                             refresh(changed)
                         }
                     }
@@ -152,7 +146,7 @@ internal object FlexibleWindowBridge {
         module.log(
             Log.WARN,
             TAG,
-            "remote prefs unavailable; bridge remains pass-through"
+            "remote prefs unavailable; sidebar bridge remains pass-through"
         )
     }
 
@@ -170,10 +164,6 @@ internal object FlexibleWindowBridge {
                 LauncherStabilityPrefs.KEY_FLEX_SPLIT_DEBOUNCE,
                 false
             ),
-            resizeDedup = prefs.getBoolean(
-                LauncherStabilityPrefs.KEY_FLEX_RESIZE_DEDUP,
-                false
-            ),
             zoomDebounceMs = prefs.getInt(
                 LauncherStabilityPrefs.KEY_FLEX_ZOOM_DEBOUNCE_MS,
                 220
@@ -181,18 +171,13 @@ internal object FlexibleWindowBridge {
             splitDebounceMs = prefs.getInt(
                 LauncherStabilityPrefs.KEY_FLEX_SPLIT_DEBOUNCE_MS,
                 280
-            ).coerceIn(100, 800),
-            resizeDedupMs = prefs.getInt(
-                LauncherStabilityPrefs.KEY_FLEX_RESIZE_DEDUP_MS,
-                16
-            ).coerceIn(4, 40)
+            ).coerceIn(100, 800)
         )
 
         if (!config.enabled) {
             lastZoomKey = null
             lastZoomAt = 0L
             splitStartAt.clear()
-            resizeStamps.clear()
         }
     }
 
@@ -217,7 +202,9 @@ internal object FlexibleWindowBridge {
                         method,
                         "sidebar/zoom/$index"
                     ) { chain ->
-                        if (!config.enabled || !config.zoomDebounce) {
+                        if (!config.enabled ||
+                            !config.zoomDebounce
+                        ) {
                             return@hook chain.proceed()
                         }
 
@@ -231,6 +218,7 @@ internal object FlexibleWindowBridge {
                         synchronized(this) {
                             val previous = lastZoomKey
                             val delta = now - lastZoomAt
+
                             if (key == previous &&
                                 delta >= 0L &&
                                 delta < config.zoomDebounceMs
@@ -262,7 +250,9 @@ internal object FlexibleWindowBridge {
                         method,
                         "sidebar/split/$index"
                     ) { chain ->
-                        if (!config.enabled || !config.splitDebounce) {
+                        if (!config.enabled ||
+                            !config.splitDebounce
+                        ) {
                             return@hook chain.proceed()
                         }
 
@@ -291,107 +281,9 @@ internal object FlexibleWindowBridge {
         return count
     }
 
-    private fun hookFlexibleUi(
-        module: Main,
-        loader: ClassLoader
-    ): Int {
-        val cls = loadClass(
-            loader,
-            "com.oplus.flexiblewindow.FlexibleTaskView"
-        ) ?: return 0
-
-        var count = 0
-
-        cls.declaredMethods
-            .filter { method ->
-                method.name == "resize" &&
-                    method.returnType == Void.TYPE &&
-                    method.parameterTypes.any {
-                        it == Rect::class.java
-                    }
-            }
-            .forEachIndexed { index, method ->
-                count += hook(
-                    module,
-                    method,
-                    "pscanvas/resize/$index"
-                ) { chain ->
-                    if (!config.enabled || !config.resizeDedup) {
-                        return@hook chain.proceed()
-                    }
-
-                    val host = chain.thisObject
-                        ?: return@hook chain.proceed()
-                    val rect = chain.args
-                        .firstOrNull { it is Rect } as? Rect
-                        ?: return@hook chain.proceed()
-
-                    val now = SystemClock.uptimeMillis()
-                    synchronized(resizeStamps) {
-                        val previous = resizeStamps[host]
-                        if (previous != null &&
-                            previous.rect == rect
-                        ) {
-                            val delta = now - previous.at
-                            if (delta >= 0L &&
-                                delta <= config.resizeDedupMs
-                            ) {
-                                return@hook null
-                            }
-                        }
-                    }
-
-                    val result = chain.proceed()
-
-                    synchronized(resizeStamps) {
-                        resizeStamps[host] = ResizeStamp(
-                            Rect(rect),
-                            SystemClock.uptimeMillis()
-                        )
-                    }
-
-                    result
-                }
-            }
-
-        // Any surface/task lifecycle boundary invalidates geometry de-duplication state.
-        // This is deliberately broader than just Surface lifecycle: a replaced/new task may
-        // legitimately need resize(Rect) even when its first bounds equal the previous task.
-        cls.declaredMethods
-            .filter {
-                it.name in setOf(
-                    "init",
-                    "surfaceReplaced",
-                    "release",
-                    "onActivityResumed",
-                    "onTaskAppeared",
-                    "onTaskInfoChanged",
-                    "onTaskReplaced",
-                    "onTaskRectOrientationChanged",
-                    "onTaskVanished",
-                    "onTaskReparent"
-                )
-            }
-            .forEachIndexed { index, method ->
-                count += hook(
-                    module,
-                    method,
-                    "pscanvas/reset/${method.name}/$index"
-                ) { chain ->
-                    chain.thisObject?.let { host ->
-                        synchronized(resizeStamps) {
-                            resizeStamps.remove(host)
-                        }
-                    }
-                    chain.proceed()
-                }
-            }
-
-        return count
-    }
-
     private fun zoomRequestKey(intent: Intent): String {
-        val component = intent.component?.flattenToShortString().orEmpty()
+        val component =
+            intent.component?.flattenToShortString().orEmpty()
         val pkg = intent.`package`.orEmpty()
         val action = intent.action.orEmpty()
         val data = intent.dataString.orEmpty()
@@ -443,6 +335,10 @@ internal object FlexibleWindowBridge {
         name: String
     ): Class<*>? =
         runCatching {
-            Class.forName(name, false, loader)
+            Class.forName(
+                name,
+                false,
+                loader
+            )
         }.getOrNull()
 }
