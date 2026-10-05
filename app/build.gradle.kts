@@ -32,11 +32,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "top.gtian.hiderecent"
+        applicationId = "cc.axymorrsen.launcherstability"
         minSdk = 29
-        targetSdk = 34
-        versionCode = 2026100103
-        versionName = "v26.10.1-generic1-hotfix2"
+        targetSdk = 37
+        versionCode = 173121030
+        versionName = "17.3.12-stability-0.10.3"
     }
 
     buildTypes {
@@ -58,6 +58,7 @@ dependencies {
     compileOnly("io.github.libxposed:api:102.0.0")
     implementation("io.github.libxposed:service:102.0.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     testImplementation("junit:junit:4.13.2")
 }

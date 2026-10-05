@@ -1,26 +1,53 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!--
-      顶部结构与 PackageViewer 一致：
-        colorPrimary     = 亮紫 #6200EE → 标题栏背景（标题文字、溢出图标白色）
-        colorPrimaryDark = 深紫 #3700B3 → 状态栏背景（状态栏图标/文字白色）
+    <style name="Theme.App" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/md_theme_primary</item>
+        <item name="colorOnPrimary">@color/md_theme_onPrimary</item>
+        <item name="colorPrimaryContainer">@color/md_theme_primaryContainer</item>
+        <item name="colorOnPrimaryContainer">@color/md_theme_onPrimaryContainer</item>
 
-      为什么改成 NoActionBar + 显式 Toolbar：
-      主题自带 ActionBar 在系统强制 edge-to-edge（Android 15+ / ColorOS）时会被顶进状态栏区域，
-      表现为「整条紫色、标题文字被状态栏盖住 = 标签栏不见了」。
-      现在状态栏高度不写死，由 MainActivity 用 WindowInsets 撑在 @id/statusBarSpacer 上，
-      标题栏永远完整可见：深紫状态栏 + 亮紫标题栏 + 白色标题。
-    -->
-    <style name="Theme.App" parent="Theme.AppCompat.Light.NoActionBar">
-        <item name="colorPrimary">@color/purple_500</item>
-        <item name="colorPrimaryDark">@color/purple_700</item>
-        <item name="colorAccent">@color/purple_700</item>
-        <!-- 双保险：即使某些 ROM 忽略 NoActionBar，也不给系统 ActionBar 留位置 -->
+        <item name="colorSecondary">@color/md_theme_secondary</item>
+        <item name="colorOnSecondary">@color/md_theme_onSecondary</item>
+        <item name="colorSecondaryContainer">@color/md_theme_secondaryContainer</item>
+        <item name="colorOnSecondaryContainer">@color/md_theme_onSecondaryContainer</item>
+
+        <item name="colorTertiary">@color/md_theme_tertiary</item>
+        <item name="colorOnTertiary">@color/md_theme_onTertiary</item>
+        <item name="colorTertiaryContainer">@color/md_theme_tertiaryContainer</item>
+        <item name="colorOnTertiaryContainer">@color/md_theme_onTertiaryContainer</item>
+
+        <item name="colorError">@color/md_theme_error</item>
+        <item name="colorOnError">@color/md_theme_onError</item>
+        <item name="colorErrorContainer">@color/md_theme_errorContainer</item>
+        <item name="colorOnErrorContainer">@color/md_theme_onErrorContainer</item>
+
+        <item name="android:colorBackground">@color/md_theme_background</item>
+        <item name="colorOnBackground">@color/md_theme_onBackground</item>
+        <item name="colorSurface">@color/md_theme_surface</item>
+        <item name="colorOnSurface">@color/md_theme_onSurface</item>
+        <item name="colorSurfaceVariant">@color/md_theme_surfaceVariant</item>
+        <item name="colorOnSurfaceVariant">@color/md_theme_onSurfaceVariant</item>
+        <item name="colorOutline">@color/md_theme_outline</item>
+        <item name="colorOutlineVariant">@color/md_theme_outlineVariant</item>
+
+        <item name="android:fontFamily">sans</item>
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
-        <!-- 状态栏：深紫 + 白色图标/文字 -->
-        <item name="android:statusBarColor">@color/purple_700</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowBackground">@color/white</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">?attr/colorSurface</item>
+        <item name="android:windowBackground">?attr/colorSurface</item>
+        <item name="android:windowDisablePreview">false</item>
+        <item name="android:windowAnimationStyle">@style/WindowAnimation</item>
     </style>
+
+    <style name="WindowAnimation">
+        <item name="android:windowEnterAnimation">@android:anim/fade_in</item>
+        <item name="android:windowExitAnimation">@android:anim/fade_out</item>
+    </style>
+
+    <style name="ShapeAppearance.LauncherStability.Card"
+        parent="ShapeAppearance.Material3.Corner.ExtraLarge" />
+
+    <style name="ShapeAppearance.LauncherStability.Control"
+        parent="ShapeAppearance.Material3.Corner.Large" />
 </resources>

@@ -1,24 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <permission
-        android:name="top.gtian.hiderecent.permission.PREFS"
-        android:protectionLevel="signature" />
-    <uses-permission android:name="top.gtian.hiderecent.permission.PREFS" />
-    <uses-permission
-        android:name="android.permission.QUERY_ALL_PACKAGES"
-        tools:ignore="QueryAllPackagesPermission" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <queries>
+        <package android:name="com.android.systemui" />
+        <package android:name="com.oplus.pscanvas" />
+        <package android:name="com.coloros.smartsidebar" />
+        <package android:name="com.oplus.securitypermission" />
+        <package android:name="com.oplus.pantanal.ums" />
+        <package android:name="com.oplus.athena" />
+        <provider android:authorities="com.oplus.card.server.systemui.provider" />
+        <provider android:authorities="com.oplusos.provider.SeedlingServiceProvider" />
+    </queries>
 
     <application
-        android:name=".HideRecentApplication"
+        android:name=".LauncherStabilityApplication"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:theme="@style/Theme.App">
 
         <activity
-            android:name=".ui.MainActivity"
+            android:name=".ui.LauncherStabilityActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -27,9 +31,10 @@
         </activity>
 
         <provider
-            android:name=".PrefsProvider"
-            android:authorities="top.gtian.hiderecent.prefs"
-            android:exported="false" />
+            android:name=".PinTaskRuntimeTraceProvider"
+            android:authorities="cc.axymorrsen.launcherstability.runtime"
+            android:exported="true"
+            android:grantUriPermissions="false" />
 
         <provider
             android:name="io.github.libxposed.service.XposedProvider"

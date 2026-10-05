@@ -1,22 +1,25 @@
-name: Android CI
+name: Launcher Stability CI
 
 on:
   workflow_dispatch:
   push:
-    branches: ['fix/**']
+    branches:
+      - 'fix/**'
+      - 'launcher-**'
   pull_request:
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-ci-${{ github.workflow }}-${{ github.ref }}
+  group: launcher-stability-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,13 +41,18 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
-      - name: Test and build debug APK
+      - name: Test and build APK
         run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace
 
-      - name: Upload debug APK artifact
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/debug/app-debug.apk             out/LauncherStability-17.3.12-stability-0.10.3.apk
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HideRecent-v26.10.1-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: LauncherStability-17.3.12-stability-0.10.3
+          path: out/LauncherStability-17.3.12-stability-0.10.3.apk
           if-no-files-found: error
           retention-days: 14

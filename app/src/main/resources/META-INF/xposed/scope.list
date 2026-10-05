@@ -1,13 +1,9 @@
-# Generic system_server layer (primary cross-ROM filtering)
+# ColorOS 17 launcher / sidebar / SystemUI / Athena plus one exact system_server
+# FlexibleWindow corner fallback. All system-server behavior is pass-through until
+# the Flexible Window master switch is enabled.
 android
 system
-
-# AOSP / Launcher3 / Pixel Quickstep hosts
 com.android.launcher
-com.android.launcher3
-com.google.android.apps.nexuslauncher
+com.coloros.smartsidebar
 com.android.systemui
-
-# ColorOS / OPlus vendor enhancement layer
-com.oplus.quickstep
-com.oplus.launcher
+com.oplus.athena

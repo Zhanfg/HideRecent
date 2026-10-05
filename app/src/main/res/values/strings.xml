@@ -1,7 +1,248 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">隐藏任务</string>
-    <string name="desc">自定义最近任务应用显示:勾选后该应用不出现在最近任务列表</string>
+    <string name="app_name">桌面稳定补丁</string>
+    <string name="desc">ColorOS 系统桌面 17.3.12 的非侵入式稳定补丁</string>
+
+    <string name="launcher_baseline">基线：系统桌面 17.3.12 · Android 17</string>
+    <string name="launcher_strategy">官方 Launcher APK 保持不变；功能通过 LSPosed 运行时注入。检测到旧 ZuyQA 重打包类时将自动拒绝注入。</string>
+    <string name="launcher_safe_features">Safe Features</string>
+    <string name="appearance_title">界面与配色</string>
+    <string name="use_dynamic_color">使用系统动态取色</string>
+    <string name="use_dynamic_color_desc">默认关闭，使用接近 LuckyTool 的经典 Material 3 紫灰色板；开启后才跟随系统壁纸动态取色。</string>
+
+    <string name="chain_health_title">ColorOS 任务链健康检查</string>
+    <string name="chain_health_desc">只读检查小窗、分屏、流体云和任务保活相关的系统组件。恢复“钉到流体云”或“小窗”入口前也会使用同一套下游预检，缺组件时保持系统原值。</string>
+    <string name="chain_health_summary_ok">关键链路正常 · %1$d/%2$d 个组件可用</string>
+    <string name="chain_health_summary_partial">检测到链路缺口 · %1$d/%2$d 个组件可用</string>
+    <string name="chain_health_available">可用</string>
+    <string name="chain_health_missing">缺失</string>
+    <string name="chain_health_refresh">重新检测</string>
+    <string name="chain_health_fluid_cloud">流体云 / SystemUI Seedling Provider</string>
+    <string name="chain_health_flexible_ui">Flexible Window UI / pscanvas</string>
+    <string name="chain_health_smart_sidebar">智能侧边栏 / SmartSidebar</string>
+    <string name="chain_health_seedling">Seedling Service / SecurityPermission</string>
+    <string name="chain_health_pantanal">Pantanal UMS</string>
+    <string name="chain_health_athena">Athena / Hans / recent-lock</string>
+    <string name="chain_health_unknown">未知组件</string>
+    <string name="pin_trace_title">最近一次 PinTask 真实链路</string>
+    <string name="pin_trace_launcher">Launcher / CapsuleManager</string>
+    <string name="pin_trace_systemui_ready">SystemUI / 模块注入</string>
+    <string name="pin_trace_systemui_ingress">SystemUI / Seedling Provider 入口</string>
+    <string name="pin_trace_systemui">SystemUI / Legacy → LiveAlert 转换</string>
+    <string name="pin_trace_systemui_plugin">SystemUIPlugin / SeedlingCardServerProvider</string>
+    <string name="pin_trace_athena_ready">Athena / 模块注入</string>
+    <string name="pin_trace_athena_ingress">Athena / Framework recent-lock 入口</string>
+    <string name="pin_trace_athena_list">Athena / Pin Lock List</string>
+    <string name="pin_trace_athena_match">Athena / isPinTask 命中</string>
+    <string name="pin_trace_hit">已命中</string>
+    <string name="pin_trace_waiting">等待</string>
+    <string name="pin_trace_detail_hit">%1$s · %2$s</string>
+    <string name="pin_trace_detail_waiting">尚未捕获到这一阶段；执行一次“钉到流体云”后刷新。</string>
+    <string name="pin_trace_wait_systemui_scope">尚未确认模块注入 SystemUI。请在 LSPosed 作用域中确认已勾选 com.android.systemui，并重启 SystemUI 或完整重启设备。</string>
+    <string name="pin_trace_wait_athena_scope">尚未确认模块注入 Athena。请在 LSPosed 作用域中确认已勾选 com.oplus.athena，并重启 Athena 或完整重启设备。</string>
+    <string name="pin_trace_wait_athena_match">isPinTask 只会在 Athena 执行清理/回收判定时调用；PinTask 已同步并不代表这一项会立刻命中。</string>
+    <string name="pin_trace_age_seconds">%1$d 秒前</string>
+    <string name="pin_trace_age_minutes">%1$d 分钟前</string>
+    <string name="pin_trace_age_hours">%1$d 小时前</string>
+
+    <string name="haptic_card_title">触觉反馈</string>
+    <string name="recents_display_title">最近任务显示</string>
+
+    <string name="haptic_effects">震动特效</string>
+    <string name="haptic_effects_desc">横向堆叠滑动继续使用已经验证准确的 ColorOS 原生速度阈值；单卡关闭、全部清空、进入最近任务可以分别选择触觉 profile。</string>
+
+    <string name="haptic_profiles_title">动作触觉映射</string>
+    <string name="haptic_profile_dismiss">单卡上滑关闭</string>
+    <string name="haptic_profile_clear_all">全部清空</string>
+    <string name="haptic_profile_recents_enter">进入最近任务</string>
+
+    <string name="haptic_lab_title">Haptic Lab</string>
+    <string name="haptic_lab_desc">逐个试听 Telegram 风格的触觉波形。Impact 适合动作边界，Selection 适合连续选择变化，Notification 适合完成、警告和错误反馈。</string>
+    <string name="haptic_preview_failed">当前设备无法播放这个触觉 profile</string>
+
+    <string name="desktop_display_title">桌面显示</string>
+    <string name="hide_workspace_labels">隐藏桌面图标名称</string>
+    <string name="hide_workspace_labels_desc">只隐藏桌面图标文字绘制，图标、点击区域和布局保持原样；关闭后即时恢复。</string>
+    <string name="hide_drawer_labels">隐藏抽屉图标名称</string>
+    <string name="hide_drawer_labels_desc">只作用于应用抽屉中的 OplusBubbleTextView，不影响桌面图标名称。</string>
+    <string name="hide_page_indicator">隐藏桌面页指示器</string>
+    <string name="hide_page_indicator_desc">隐藏 OplusPageIndicator 的显示，但保留原布局位置和页面切换逻辑。</string>
+    <string name="hide_bottom_search">隐藏底部搜索框 / QSB</string>
+    <string name="hide_bottom_search_desc">隐藏 BottomSearchBoxContainerView 与 QsbWidgetHostView 的显示，不修改桌面数据库或 DeviceProfile。</string>
+
+    <string name="hide_task_title">隐藏最近任务标题</string>
+    <string name="hide_task_title_desc">仅控制 OplusTaskHeaderView 的标题视图，不修改任务动画。</string>
+    <string name="hide_task_icon">隐藏最近任务图标</string>
+    <string name="hide_task_icon_desc">仅控制任务头部图标，不改 Surface、Spring 或窗口矩阵。</string>
+    <string name="hide_clear_button">隐藏清除按钮</string>
+    <string name="hide_clear_button_desc">保留布局空间，仅隐藏清除面板显示，避免重排最近任务。</string>
+    <string name="extended_features_title">扩展功能</string>
+    <string name="extended_features_desc">参考 LuckyTool 与 OShin 的公开实现，并按系统桌面 17.3.12 实际类/方法重新适配。所有新增功能默认关闭；实验功能可能需要重启桌面进程。</string>
+
+    <string name="ext_stable_title">稳定扩展</string>
+    <string name="force_memory_info">强制显示最近任务内存信息</string>
+    <string name="force_memory_info_desc">若当前运行时提供 MemoryInfoManager，则强制允许内存信息与详情显示；类不存在时自动跳过。</string>
+    <string name="auto_close_folder">从文件夹启动应用后自动关闭文件夹</string>
+    <string name="auto_close_folder_desc">在官方 closeOpenViews 流程内补齐 TYPE_FOLDER 关闭，不修改文件夹数据库。</string>
+    <string name="remove_folder_preview_bg">移除文件夹预览背景</string>
+    <string name="remove_folder_preview_bg_desc">跳过 OplusPreviewBackground 的背景绘制；文件夹图标内容仍正常显示。</string>
+    <string name="remove_update_green_dot">隐藏应用更新绿点</string>
+    <string name="remove_update_green_dot_desc">关闭 BubbleTextView 的更新绿点判定，不影响通知圆点。</string>
+    <string name="hide_recents_dock">隐藏最近任务底部 Dock 图标</string>
+    <string name="hide_recents_dock_desc">让最近任务 DockView 进入隐藏状态，不修改任务卡片本体。</string>
+    <string name="restore_pin_capsule">恢复“钉到流体云”原生入口</string>
+    <string name="restore_pin_capsule_desc">恢复 ColorOS 17 原生 PinTask 入口；Launcher 仍使用 OEM CapsuleManager，SystemUI 只兼容转发 legacy oplus_pin_task / oplus_cancel_pin 到现存 LiveAlert。已确认 Framework 会把 pin lock task 同步进 Athena，Athena 清理最近任务时命中 isPinTask 会直接跳过移除。这是任务级保护，不等于进程永久前台或 OSense FreezeProtect；后者不会被本模块伪造开启。</string>
+    <string name="restore_floating_window_shortcut">恢复最近任务“小窗”原生入口</string>
+    <string name="restore_floating_window_shortcut_desc">只恢复 AppFeatureUtils.isSupportFlexibleFloatingWindow 全局门控。ColorOS 17 原生 OplusTaskShortcutsFactory 仍会继续检查任务组件、displayId、分屏/单手模式以及应用自身小窗支持；真正打开小窗仍走 FlexibleWindowManager / OplusZoomWindowManager，不绕过兼容白名单。</string>
+    <string name="recents_long_press_app_info">长按最近任务图标打开应用详情</string>
+    <string name="recents_long_press_app_info_desc">在 OplusTaskViewImpl 绑定任务图标后包装图标和标题长按；关闭时继续走系统原有长按行为。</string>
+    <string name="disable_auto_focus_next_task">关闭后台自动聚焦下一任务</string>
+    <string name="disable_auto_focus_next_task_desc">关闭 AppFeatureUtils 的 Overview 自动跳下一卡逻辑，减少卡片关闭后自动偏移。</string>
+    <string name="enable_indicator_entry">启用桌面指示器菜单入口</string>
+    <string name="enable_indicator_entry_desc">强制开放 IndicatorEntry 的菜单能力；具体入口仍由系统桌面本身决定。</string>
+    <string name="unlimit_folder_name">移除文件夹名称输入限制</string>
+    <string name="unlimit_folder_name_desc">替换 OplusFolder 的名称 TextWatcher。此项会改变厂商输入限制，建议改完名称后关闭。</string>
+    <string name="disable_icon_secondary_menu">禁用图标长按二级快捷项</string>
+    <string name="disable_icon_secondary_menu_desc">抑制 PopupDataProvider 的附加快捷项计数，保留基础应用操作。</string>
+    <string name="allow_excluded_task_lock">允许锁定被排除的最近任务</string>
+    <string name="allow_excluded_task_lock_desc">仅在锁定判定期间临时移除 FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS，判定结束后恢复 Intent。</string>
+    <string name="unlock_task_lock_limit">解除最近任务锁定数量限制</string>
+    <string name="unlock_task_lock_limit_desc">对 isAppAllowLock / isAppAllowUnlock 放宽限制；默认关闭。</string>
+
+    <string name="ext_icon_title">图标 / 角标</string>
+    <string name="custom_icon_size_enabled">自定义桌面图标尺寸</string>
+    <string name="custom_icon_size_enabled_desc">覆盖 BubbleTextView.getIconSize 的返回值；只在启用时生效，关闭后恢复系统尺寸。</string>
+    <string name="icon_size_dp">图标尺寸</string>
+    <string name="remove_shortcut_badge">隐藏快捷方式角标</string>
+    <string name="remove_shortcut_badge_desc">仅抑制 BitmapInfo 的 badgeInfo 角标，不影响应用本身图标。</string>
+    <string name="remove_work_badge">隐藏工作资料角标</string>
+    <string name="remove_work_badge_desc">仅在图标构建期间临时移除工作资料 flag，生成完成后恢复原始状态。</string>
+    <string name="remove_clone_badge">隐藏应用分身角标</string>
+    <string name="remove_clone_badge_desc">仅在图标构建期间临时移除应用分身 flag，生成完成后恢复原始状态。</string>
+
+    <string name="ext_dock_title">Dock / 模糊</string>
+    <string name="enable_dock_background">强制启用 Dock 背景能力</string>
+    <string name="enable_dock_background_desc">开放 isSupportDockerExpandScreen，供系统桌面使用其原生 Dock 背景。</string>
+    <string name="force_dock_blur">强制启用新 Dock 模糊</string>
+    <string name="force_dock_blur_desc">开放 OplusBlurProperties 新模糊与大屏特性门控；属于中风险视觉功能。</string>
+    <string name="dock_alpha_enabled">自定义 Dock 背景透明度</string>
+    <string name="dock_alpha_enabled_desc">启用后覆盖 OplusHotseat.setBackgroundAlpha 的输入值。</string>
+    <string name="dock_alpha">Dock 背景不透明度</string>
+    <string name="blur_corner_enabled">自定义模糊圆角</string>
+    <string name="blur_corner_enabled_desc">启用后覆盖 OplusBlurProperties.setBlurCornerRadius 的圆角半径。</string>
+    <string name="blur_corner">模糊圆角半径</string>
+    <string name="dock_max_enabled">扩展 Dock 最大图标数量</string>
+    <string name="dock_max_enabled_desc">提高 ExpandConfig 返回的最大数量，不会降低系统原本允许的数量。</string>
+    <string name="dock_max_items">Dock 最大图标数</string>
+
+    <string name="ext_experimental_title">实验功能 · 默认关闭</string>
+    <string name="default_home_enabled">自定义默认主页</string>
+    <string name="default_home_enabled_desc">修改 Workspace.DEFAULT_PAGE。页码从 1 开始显示；越界时系统桌面仍可能自动纠正。</string>
+    <string name="default_home_page">默认主页</string>
+    <string name="folder_grid_enabled">自定义文件夹行列</string>
+    <string name="folder_grid_enabled_desc">修改当前 InvariantDeviceProfile 的文件夹行列并同步预览；部分变化可能需要重启桌面进程。</string>
+    <string name="folder_rows">文件夹行数</string>
+    <string name="folder_columns">文件夹列数</string>
+    <string name="drawer_grid_enabled">自定义抽屉列数</string>
+    <string name="drawer_grid_enabled_desc">修改 numAllAppsColumns；属于布局实验项，建议逐级调整。</string>
+    <string name="drawer_columns">抽屉列数</string>
+    <string name="force_fold_mode">模拟折叠屏桌面模式</string>
+    <string name="force_fold_mode_desc">覆盖 ScreenUtils 的折叠状态判断，会影响 Dock 和布局策略；仅用于实验。</string>
+    <string name="fold_mode">模拟状态</string>
+    <string name="fold_mode_expanded">展开态</string>
+    <string name="fold_mode_folded">折叠态</string>
+
+    <string name="performance_engine_title">性能与交互优化</string>
+    <string name="performance_engine_desc">以降低交互延迟和热路径开销为目标，不锁 CPU/GPU 频率、不常驻高性能模式。后台切卡与桌面拖动分别调节，默认关闭。</string>
+
+    <string name="perf_master_section">总开关</string>
+    <string name="perf_engine_enabled">启用 Performance Engine</string>
+    <string name="perf_engine_enabled_desc">关闭时所有性能 Hook 保持原厂透传；热路径缓存仍只保存反射元数据，不进行持续轮询。</string>
+
+    <string name="perf_oem_native_section">OPlus 原生性能路径</string>
+    <string name="perf_oem_async_task_launch">异步 TaskView 启动动画</string>
+    <string name="perf_oem_async_task_launch_desc">强制开放 Launcher 17.3.12 内置 enableAsyncTaskViewLaunchWindowAnim()。只抬 OEM feature gate，实际线程、动画与生命周期仍由系统桌面原生代码负责。</string>
+    <string name="perf_oem_interrupt_spring">TaskView 可中断 Spring</string>
+    <string name="perf_oem_interrupt_spring_desc">开放 enableTaskViewInterruptSpringAnim()，让快速连续操作时优先走厂商自己的可中断弹簧路径，而不是等待前一段动画完整结束。</string>
+    <string name="perf_oem_async_spring_scroll">后台异步 Spring Scroll</string>
+    <string name="perf_oem_async_spring_scroll_desc">开放 enableTaskWindowAsyncSpringScroll()，使用 OPlus 已存在的异步任务窗口弹簧滚动实现；不改 SurfaceControl 矩阵。</string>
+    <string name="perf_oem_swipe_home_spring">原生上滑回桌面窗口 Spring</string>
+    <string name="perf_oem_swipe_home_spring_desc">同时开放 isSupportRecentsSwipeUpWindowSpring() 并关闭其 negative disable gate；具体窗口 Spring 参数仍完全使用 ColorOS 原生值。</string>
+
+    <string name="perf_recents_section">多任务切换</string>
+    <string name="perf_adaptive_recents">速度自适应卡片吸附</string>
+    <string name="perf_adaptive_recents_desc">慢拖保持精细控制，快速甩动按当前速度逐渐缩短 settle 时间，避免每次都用固定倍速。</string>
+    <string name="perf_recents_settle_floor">高速吸附最短倍率</string>
+    <string name="perf_decisive_fling">更明确的 Fling 判定</string>
+    <string name="perf_decisive_fling_desc">只放大超过快速甩动阈值的手势；低速手势略微降敏，减少误切卡。不会修改触摸轨迹本身。</string>
+    <string name="perf_fling_gain">高速 Fling 增益</string>
+
+    <string name="perf_workspace_section">桌面拖动</string>
+    <string name="perf_workspace_drag_paging">拖动图标时加快跨页吸附</string>
+    <string name="perf_workspace_drag_paging_desc">仅在 Workspace 处于 onDragStart → onDragEnd 期间缩短分页 snap duration；正常桌面左右翻页保持系统原值。</string>
+    <string name="perf_drag_page_multiplier">拖动跨页时长倍率</string>
+
+    <string name="flex_bridge_title">小窗 / 分屏 Bridge</string>
+    <string name="flex_bridge_desc">SmartSidebar 的小窗/分屏请求全部保留原厂调用，不再做请求抑制；OplusFlexibleWindowUI / pscanvas 与 SurfaceControl 仍完全原生。system_server 只在 OEM getCornerRadius() 异常返回 0/负值时补 28dp 圆角，正常非零策略值绝不覆盖。</string>
+
+    <string name="flex_master_section">总开关</string>
+    <string name="flex_bridge_enabled">启用 Flexible Window Bridge</string>
+    <string name="flex_bridge_enabled_desc">开启后仍不改变小窗白名单、不触碰 pscanvas；只启用重复请求诊断与 system_server 的零圆角兜底。关闭时全部保持原厂结果。</string>
+
+    <string name="flex_sidebar_section">智能侧边栏</string>
+    <string name="flex_zoom_debounce">观察重复小窗启动请求</string>
+    <string name="flex_zoom_debounce_desc">只记录极短时间内相同 Intent 的重复 startActivityAsZoomWindow，用于诊断；所有请求都会继续执行，避免丢失 ColorOS 后续裁剪、圆角和窗口状态同步。</string>
+    <string name="flex_zoom_debounce_ms">小窗重复请求窗口</string>
+    <string name="flex_split_debounce">观察重复分屏拖放请求</string>
+    <string name="flex_split_debounce_desc">只记录同一 SplitScreenHandler 的短时间重复请求，不再阻止任何 OEM 分屏调用；系统 Intent、WM Shell 和 StageCoordinator 全部保持原链。</string>
+    <string name="flex_split_debounce_ms">分屏重复请求窗口</string>
+
+    <string name="flex_canvas_section">Flexible Window UI</string>
+    <string name="flex_resize_dedup">去除同帧重复窗口 resize</string>
+    <string name="flex_resize_dedup_desc">ColorOS 17 的 onLayout、任务创建/替换与内部布局更新都会汇聚到 FlexibleTaskView.resize(Rect)。这里只跳过同一 FlexibleTaskView、同一 Rect、极短窗口内的重复调用，从而减少 executor 排队与重复 WindowContainerTransaction 路径。所有 Surface、Activity、task appeared/info/replaced/orientation/vanished/reparent 生命周期边界都会先清缓存。</string>
+    <string name="flex_resize_dedup_ms">Resize 去重时间窗</string>
+
+    <string name="animation_engine_title">实验动画引擎</string>
+    <string name="animation_engine_desc">所有动画增强都有独立总开关。实现限制在 Launcher View、OEM Animator 与现有 Recents Spring 层，不直接写 SurfaceControl.Transaction 矩阵。</string>
+
+    <string name="anim_master_section">总开关</string>
+    <string name="anim_engine_enabled">启用实验动画引擎</string>
+    <string name="anim_engine_enabled_desc">关闭时所有动画 Hook 都保持原厂透传；建议先打开总开关，再逐项启用。</string>
+
+    <string name="anim_app_section">应用开合 / Break / Home</string>
+    <string name="anim_icon_pulse">应用开合图标物理脉冲</string>
+    <string name="anim_icon_pulse_desc">在 APP_LAUNCH / APP_CLOSE / TASK_VIEW_LAUNCH 起点对来源图标做短促压缩与回弹，不触碰远端窗口 Surface。</string>
+    <string name="anim_icon_pulse_scale">脉冲最小缩放</string>
+    <string name="anim_icon_tilt">应用开合 3D 微倾斜</string>
+    <string name="anim_icon_tilt_desc">给来源图标增加很短的 Y 轴透视倾斜；关闭或动画结束会恢复原始 rotationY。</string>
+    <string name="anim_icon_tilt_deg">图标倾斜角度</string>
+    <string name="anim_transition_timing">调整开合 / Break 动画时序</string>
+    <string name="anim_transition_timing_desc">对 OPlus 动画集合中 APP、BREAK、SWIPE、HOME、TASK_VIEW 类型的 Android Animator 保留原插值器，仅按比例调整 duration。</string>
+    <string name="anim_transition_multiplier">动画时长倍率</string>
+
+    <string name="anim_recents_section">堆叠后台 / 抛掷 / Spring</string>
+    <string name="anim_recents_tilt">堆叠后台 3D 空间倾斜</string>
+    <string name="anim_recents_tilt_desc">根据卡片相对屏幕中心的位置动态设置 TaskView rotationY，形成左右连续透视；离开或关闭后恢复原值。</string>
+    <string name="anim_recents_tilt_deg">最大倾斜角度</string>
+    <string name="anim_running_scale">运行任务空间缩放</string>
+    <string name="anim_running_scale_desc">在系统 getTargetRunningTaskScale 的原值上做小范围倍率调整，用于控制堆叠后台纵深感。</string>
+    <string name="anim_running_scale_value">运行任务缩放倍率</string>
+    <string name="anim_snap_tuning">调整卡片吸附时长</string>
+    <string name="anim_snap_tuning_desc">按倍率调整 getPageSnapAnimationDuration；小于 1 更利落，大于 1 更柔和。</string>
+    <string name="anim_snap_multiplier">吸附时长倍率</string>
+    <string name="anim_overscroll_tuning">调整边缘弹性</string>
+    <string name="anim_overscroll_tuning_desc">缩放系统 getSmoothOverScrollAmount 的结果，控制后台滑到边缘时的回弹幅度。</string>
+    <string name="anim_overscroll_multiplier">边缘弹性倍率</string>
+    <string name="anim_fling_tuning">调整卡片抛掷响应</string>
+    <string name="anim_fling_tuning_desc">仅在 shouldFlingForVelocity 判定前缩放速度输入，不改手势轨迹；大于 1 更容易触发 fling。</string>
+    <string name="anim_fling_multiplier">Fling 响应倍率</string>
+    <string name="anim_spring_tuning">调整后台移动 Spring</string>
+    <string name="anim_spring_tuning_desc">在 OPlus applyMoveSpringConfig 完成后读取 AndroidX SpringForce，再按比例调整 stiffness / dampingRatio。</string>
+    <string name="anim_spring_stiffness">Spring 刚度倍率</string>
+    <string name="anim_spring_damping">Spring 阻尼倍率</string>
+
+    <string name="launcher_risk_note">实验动画总开关默认关闭。当前 3D 倾斜采用 View 层等效实现，并保留 OEM Animator / Spring 主链；旧第一版 ZuyqaWindowTilt 那种直接写 SurfaceControl.Transaction 矩阵的实现仍被隔离，避免重新引入锁屏、桌面卡死或黑帧风险。</string>
+    <string name="launcher_apply_note">运行时配置已连接 · 修改普通开关即时同步；新增 Hook 类型或升级模块后重启系统桌面进程。</string>
 
     <string name="search">搜索</string>
     <string name="orderBy">排序</string>
@@ -11,7 +252,6 @@
     <string name="show_system_app">显示系统应用</string>
     <string name="show_user_app">显示用户应用</string>
     <string name="loading">正在加载应用列表…</string>
-
     <string name="hide_self">隐藏自身</string>
     <string name="about">关于</string>
     <string name="open_link_failed">未找到可打开链接的应用</string>
