@@ -522,38 +522,9 @@ internal object LauncherExtendedFeatures {
                 }
         }
 
-        // Match LuckyTool's actual ColorOS 17 gate so code below AppFeatureUtils
-        // sees the same feature state as SystemUIPlugin.
-        loadClass(
-            loader,
-            "com.oplus.content.OplusFeatureConfigManager"
-        )?.let { cls ->
-            cls.declaredMethods
-                .filter {
-                    it.name == "hasFeature" &&
-                        it.parameterTypes.contentEquals(
-                            arrayOf(String::class.java)
-                        ) &&
-                        it.returnType == Boolean::class.javaPrimitiveType
-                }
-                .forEachIndexed { index, method ->
-                    count += hook(
-                        module,
-                        method,
-                        "capsule/featureGate/$index"
-                    ) { chain ->
-                        val key =
-                            chain.args.firstOrNull() as? String
-                        if (config.restorePinCapsule &&
-                            key == "oplus.software.systemui.pin_task"
-                        ) {
-                            true
-                        } else {
-                            chain.proceed()
-                        }
-                    }
-                }
-        }
+        // Do not override OplusFeatureConfigManager globally in Launcher.
+        // OplusTaskShortcutsFactory only needs AppFeatureUtils.isSupportPinCapsule();
+        // native CapsuleManager.isTaskSupportPin() keeps all per-task OEM restrictions.
 
         return count
     }
