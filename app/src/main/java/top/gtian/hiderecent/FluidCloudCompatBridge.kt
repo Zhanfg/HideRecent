@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.app.Notification
 import android.app.TaskInfo
 import android.content.Context
+import android.content.ContentProvider
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
@@ -80,6 +81,7 @@ internal object FluidCloudCompatBridge {
     private val bootstrapStarted = AtomicBoolean(false)
     private val generation = AtomicInteger(0)
     private val pinsByTaskId = ConcurrentHashMap<Int, PinRecord>()
+    private val dynamicProviderHooks = ConcurrentHashMap.newKeySet<String>()
 
     fun hook(module: Main, loader: ClassLoader) {
         if (!bootstrapStarted.compareAndSet(false, true)) return
@@ -120,6 +122,7 @@ internal object FluidCloudCompatBridge {
         prefsListener = null
         config = Config()
         pinsByTaskId.clear()
+        dynamicProviderHooks.clear()
     }
 
     private fun bootstrapPrefs(
@@ -161,6 +164,11 @@ internal object FluidCloudCompatBridge {
                     Log.INFO,
                     TAG,
                     "remote prefs attached attempt=$attempt enabled=${config.enabled}"
+                )
+                PinTaskRuntimeTraceReporter.record(
+                    context = module.currentContext(),
+                    stage = PinTaskRuntimeTrace.STAGE_SYSTEMUI_READY,
+                    detail = "SystemUI hook ready; wrapperHooks active; enabled=${config.enabled}"
                 )
                 return
             }
@@ -264,6 +272,12 @@ internal object FluidCloudCompatBridge {
                     val legacyMethod =
                         chain.args[methodIndex] as? String
                             ?: return@hook chain.proceed()
+
+                    PinTaskRuntimeTraceReporter.record(
+                        context = module.currentContext(),
+                        stage = PinTaskRuntimeTrace.STAGE_SYSTEMUI_INGRESS,
+                        detail = "SeedlingCardProvider.call received $legacyMethod"
+                    )
 
                     val extrasIndex = chain.args.indexOfLast {
                         it is Bundle
@@ -375,7 +389,112 @@ internal object FluidCloudCompatBridge {
                 }
             }
 
+        cls.declaredMethods
+            .filter {
+                it.name in setOf(
+                    "createPluginContentProvider",
+                    "onPluginAdded",
+                    "attachInfo"
+                )
+            }
+            .forEachIndexed { index, method ->
+                count += hook(
+                    module,
+                    method,
+                    "provider/pluginBootstrap/${method.name}/$index"
+                ) { chain ->
+                    val result = chain.proceed()
+                    chain.thisObject?.let { host ->
+                        installDynamicPluginProviderHooks(
+                            module = module,
+                            host = host
+                        )
+                    }
+                    result
+                }
+            }
+
         return count
+    }
+
+    private fun installDynamicPluginProviderHooks(
+        module: Main,
+        host: Any
+    ) {
+        val provider = findNestedContentProvider(host) ?: return
+        val providerClass = provider.javaClass
+
+        providerClass.declaredMethods
+            .filter {
+                it.name == "call" &&
+                    Bundle::class.java.isAssignableFrom(it.returnType)
+            }
+            .forEachIndexed { index, method ->
+                val key =
+                    System.identityHashCode(providerClass.classLoader).toString() +
+                        ":" + providerClass.name + ":" + method.toGenericString()
+                if (!dynamicProviderHooks.add(key)) return@forEachIndexed
+
+                val installed = hook(
+                    module,
+                    method,
+                    "plugin/call/${providerClass.name}/$index"
+                ) { chain ->
+                    val calledMethod = chain.args.firstOrNull {
+                        it is String && (
+                            it == METHOD_SEND ||
+                                it == METHOD_CANCEL ||
+                                it == METHOD_PIN ||
+                                it == METHOD_UNPIN
+                            )
+                    } as? String
+
+                    if (calledMethod != null) {
+                        PinTaskRuntimeTraceReporter.record(
+                            context = module.currentContext(),
+                            stage = PinTaskRuntimeTrace.STAGE_SYSTEMUI_PLUGIN,
+                            detail =
+                                providerClass.name +
+                                    ".call(" + calledMethod + ")"
+                        )
+                    }
+
+                    chain.proceed()
+                }
+
+                if (installed > 0) {
+                    module.log(
+                        Log.INFO,
+                        TAG,
+                        "dynamic plugin provider hook installed " +
+                            providerClass.name + " method=" + method.toGenericString()
+                    )
+                } else {
+                    dynamicProviderHooks.remove(key)
+                }
+            }
+    }
+
+    private fun findNestedContentProvider(host: Any): ContentProvider? {
+        var cls: Class<*>? = host.javaClass
+        while (cls != null) {
+            for (field in cls.declaredFields) {
+                val candidate = runCatching {
+                    field.isAccessible = true
+                    field.get(host)
+                }.getOrNull()
+
+                if (candidate is ContentProvider &&
+                    candidate.javaClass.name.contains(
+                        "SeedlingCardServerProvider"
+                    )
+                ) {
+                    return candidate
+                }
+            }
+            cls = cls.superclass
+        }
+        return null
     }
 
     private fun buildPinTranslation(
