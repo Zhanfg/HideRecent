@@ -1,6 +1,7 @@
 package top.gtian.hiderecent
 
 import android.content.SharedPreferences
+import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
 import io.github.libxposed.api.XposedInterface
@@ -122,6 +123,11 @@ internal object AthenaPinTaskProbe {
                     TAG,
                     "remote prefs attached attempt=$attempt enabled=${config.enabled}"
                 )
+                PinTaskRuntimeTraceReporter.record(
+                    context = module.currentContext(),
+                    stage = PinTaskRuntimeTrace.STAGE_ATHENA_READY,
+                    detail = "Athena hook ready; enabled=${config.enabled}"
+                )
                 return
             }
 
@@ -161,6 +167,38 @@ internal object AthenaPinTaskProbe {
         }.getOrNull() ?: return 0
 
         var count = 0
+
+        cls.declaredMethods
+            .filter {
+                it.name == "updateRecentLockListFromFw" &&
+                    it.parameterTypes.size == 2 &&
+                    Bundle::class.java.isAssignableFrom(
+                        it.parameterTypes[0]
+                    ) &&
+                    it.parameterTypes[1] == Int::class.javaPrimitiveType
+            }
+            .forEachIndexed { index, method ->
+                count += hook(
+                    module,
+                    method,
+                    "fwIngress/$index"
+                ) { chain ->
+                    if (config.enabled) {
+                        val extras = chain.args.firstOrNull() as? Bundle
+                        val userId =
+                            (chain.args.getOrNull(1) as? Number)?.toInt()
+
+                        PinTaskRuntimeTraceReporter.record(
+                            context = module.currentContext(),
+                            stage = PinTaskRuntimeTrace.STAGE_ATHENA_INGRESS,
+                            detail = "updateRecentLockListFromFw; user=" +
+                                userId + "; keys=" +
+                                extras?.keySet()?.sorted()
+                        )
+                    }
+                    chain.proceed()
+                }
+            }
 
         cls.declaredMethods
             .filter {
