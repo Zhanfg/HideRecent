@@ -71,7 +71,7 @@
     <string name="hide_recents_dock">隐藏最近任务底部 Dock 图标</string>
     <string name="hide_recents_dock_desc">让最近任务 DockView 进入隐藏状态，不修改任务卡片本体。</string>
     <string name="restore_pin_capsule">恢复“钉到流体云”原生入口</string>
-    <string name="restore_pin_capsule_desc">恢复 ColorOS 17 原生 PinTask 入口，并在 SystemUI 中补齐新版缺失的兼容路由：oplus_pin_task / oplus_cancel_pin → synthetic StatusBarNotification(oplus.pinTaskInfo) → sendLiveAlert / cancelLiveAlert。任务是否可钉仍由 Launcher 原生 isTaskSupportPin 判定；不会伪造强保活。</string>
+    <string name="restore_pin_capsule_desc">恢复 ColorOS 17 原生 PinTask 入口；SystemUI 仅把 legacy oplus_pin_task / oplus_cancel_pin 转发到现存 sendLiveAlert / cancelLiveAlert，并在转发期间使用 SystemUI 本地 Binder 身份通过 Seedling 调用方校验。任务是否可钉仍由 Launcher 原生 isTaskSupportPin 判定；不会伪造强保活。</string>
     <string name="restore_floating_window_shortcut">恢复最近任务“小窗”原生入口</string>
     <string name="restore_floating_window_shortcut_desc">只恢复 AppFeatureUtils.isSupportFlexibleFloatingWindow 全局门控。ColorOS 17 原生 OplusTaskShortcutsFactory 仍会继续检查任务组件、displayId、分屏/单手模式以及应用自身小窗支持；真正打开小窗仍走 FlexibleWindowManager / OplusZoomWindowManager，不绕过兼容白名单。</string>
     <string name="recents_long_press_app_info">长按最近任务图标打开应用详情</string>
@@ -163,18 +163,18 @@
     <string name="perf_drag_page_multiplier">拖动跨页时长倍率</string>
 
     <string name="flex_bridge_title">小窗 / 分屏 Bridge</string>
-    <string name="flex_bridge_desc">只作用于 SmartSidebar 的小窗/分屏入口，不再注入 OplusFlexibleWindowUI。FlexibleTaskView、圆角、裁剪、SurfaceControl 与 system_server 状态机全部保持 ColorOS 原生。</string>
+    <string name="flex_bridge_desc">SmartSidebar 的小窗/分屏请求全部保留原厂调用，不再做请求抑制；OplusFlexibleWindowUI / pscanvas 与 SurfaceControl 仍完全原生。system_server 只在 OEM getCornerRadius() 异常返回 0/负值时补 28dp 圆角，正常非零策略值绝不覆盖。</string>
 
     <string name="flex_master_section">总开关</string>
     <string name="flex_bridge_enabled">启用 Flexible Window Bridge</string>
-    <string name="flex_bridge_enabled_desc">关闭时 SmartSidebar 桥接 Hook 全部保持原厂透传；不会改变应用小窗兼容白名单，也不会触碰 pscanvas。</string>
+    <string name="flex_bridge_enabled_desc">开启后仍不改变小窗白名单、不触碰 pscanvas；只启用重复请求诊断与 system_server 的零圆角兜底。关闭时全部保持原厂结果。</string>
 
     <string name="flex_sidebar_section">智能侧边栏</string>
-    <string name="flex_zoom_debounce">过滤重复小窗启动请求</string>
-    <string name="flex_zoom_debounce_desc">仅阻止极短时间内完全相同 Intent 的重复 startActivityAsZoomWindow；首个请求仍完整走 OplusZoomWindowManager.startZoomWindow、多用户/分身与失败回调。</string>
+    <string name="flex_zoom_debounce">观察重复小窗启动请求</string>
+    <string name="flex_zoom_debounce_desc">只记录极短时间内相同 Intent 的重复 startActivityAsZoomWindow，用于诊断；所有请求都会继续执行，避免丢失 ColorOS 后续裁剪、圆角和窗口状态同步。</string>
     <string name="flex_zoom_debounce_ms">小窗重复请求窗口</string>
-    <string name="flex_split_debounce">过滤重复分屏拖放请求</string>
-    <string name="flex_split_debounce_desc">阻止同一个 SplitScreenHandler 在极短时间重复创建 DragAndDrop；不会替换系统分屏 Intent、WM Shell 或 StageCoordinator。</string>
+    <string name="flex_split_debounce">观察重复分屏拖放请求</string>
+    <string name="flex_split_debounce_desc">只记录同一 SplitScreenHandler 的短时间重复请求，不再阻止任何 OEM 分屏调用；系统 Intent、WM Shell 和 StageCoordinator 全部保持原链。</string>
     <string name="flex_split_debounce_ms">分屏重复请求窗口</string>
 
     <string name="flex_canvas_section">Flexible Window UI</string>
