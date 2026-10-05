@@ -381,6 +381,7 @@ internal object FluidCloudCompatBridge {
             pinInfo = pinInfo
         )
 
+        @Suppress("DEPRECATION")
         val sbn = StatusBarNotification(
             packageName,
             packageName,
@@ -388,9 +389,9 @@ internal object FluidCloudCompatBridge {
             "launcher_pin_task_$taskId",
             uid,
             pid,
+            0,
             notification,
-            UserHandle.of(userId),
-            null,
+            UserHandle(userId),
             System.currentTimeMillis()
         )
 
