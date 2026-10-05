@@ -71,7 +71,7 @@
     <string name="hide_recents_dock">隐藏最近任务底部 Dock 图标</string>
     <string name="hide_recents_dock_desc">让最近任务 DockView 进入隐藏状态，不修改任务卡片本体。</string>
     <string name="restore_pin_capsule">恢复“钉到流体云”原生入口</string>
-    <string name="restore_pin_capsule_desc">恢复 ColorOS 17 原生 PinTask 入口；SystemUI 仅把 legacy oplus_pin_task / oplus_cancel_pin 转发到现存 sendLiveAlert / cancelLiveAlert，并在转发期间使用 SystemUI 本地 Binder 身份通过 Seedling 调用方校验。任务是否可钉仍由 Launcher 原生 isTaskSupportPin 判定；不会伪造强保活。</string>
+    <string name="restore_pin_capsule_desc">恢复 ColorOS 17 原生 PinTask 入口；Launcher 仍使用 OEM CapsuleManager，SystemUI 只兼容转发 legacy oplus_pin_task / oplus_cancel_pin 到现存 LiveAlert。已确认 Framework 会把 pin lock task 同步进 Athena，Athena 清理最近任务时命中 isPinTask 会直接跳过移除。这是任务级保护，不等于进程永久前台或 OSense FreezeProtect；后者不会被本模块伪造开启。</string>
     <string name="restore_floating_window_shortcut">恢复最近任务“小窗”原生入口</string>
     <string name="restore_floating_window_shortcut_desc">只恢复 AppFeatureUtils.isSupportFlexibleFloatingWindow 全局门控。ColorOS 17 原生 OplusTaskShortcutsFactory 仍会继续检查任务组件、displayId、分屏/单手模式以及应用自身小窗支持；真正打开小窗仍走 FlexibleWindowManager / OplusZoomWindowManager，不绕过兼容白名单。</string>
     <string name="recents_long_press_app_info">长按最近任务图标打开应用详情</string>
