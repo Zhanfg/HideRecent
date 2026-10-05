@@ -35,6 +35,7 @@ class Main : XposedModule() {
         const val LAUNCHER_PKG = "com.android.launcher"
         const val SMART_SIDEBAR_PKG = "com.coloros.smartsidebar"
         const val SYSTEMUI_PKG = "com.android.systemui"
+        const val ATHENA_PKG = "com.oplus.athena"
 
         val DEFAULT_RECENTS_HOST_PKGS = setOf(
             LAUNCHER_PKG
@@ -118,6 +119,20 @@ class Main : XposedModule() {
                     it
                 )
             }
+
+            ATHENA_PKG -> runCatching {
+                AthenaPinTaskProbe.hook(
+                    this,
+                    param.defaultClassLoader
+                )
+            }.onFailure {
+                log(
+                    Log.ERROR,
+                    TAG,
+                    "Athena PinTask probe failed",
+                    it
+                )
+            }
         }
     }
 
@@ -126,6 +141,7 @@ class Main : XposedModule() {
         LauncherStabilityHook.prepareHotReload()
         FlexibleWindowBridge.prepareHotReload()
         FluidCloudCompatBridge.prepareHotReload()
+        AthenaPinTaskProbe.prepareHotReload()
         SystemWindowCornerBridge.prepareHotReload()
         return true
     }
@@ -186,6 +202,20 @@ class Main : XposedModule() {
                     Log.ERROR,
                     TAG,
                     "hot reload fluid-cloud rehook failed",
+                    it
+                )
+            }
+
+            ATHENA_PKG -> runCatching {
+                AthenaPinTaskProbe.hook(
+                    this,
+                    loader
+                )
+            }.onFailure {
+                log(
+                    Log.ERROR,
+                    TAG,
+                    "hot reload Athena PinTask rehook failed",
                     it
                 )
             }
