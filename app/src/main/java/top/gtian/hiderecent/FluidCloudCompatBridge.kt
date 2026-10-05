@@ -97,6 +97,12 @@ internal object FluidCloudCompatBridge {
             "SystemUI fluid-cloud compat skeleton installed hooks=$count"
         )
 
+        reportReadyAsync(
+            module = module,
+            expectedGeneration = expectedGeneration,
+            hookCount = count
+        )
+
         Thread({
             bootstrapPrefs(module, expectedGeneration)
         }, "LauncherStabilityFluidPrefs").apply {
@@ -123,6 +129,32 @@ internal object FluidCloudCompatBridge {
         config = Config()
         pinsByTaskId.clear()
         dynamicProviderHooks.clear()
+    }
+
+    private fun reportReadyAsync(
+        module: Main,
+        expectedGeneration: Int,
+        hookCount: Int
+    ) {
+        Thread({
+            repeat(24) {
+                if (generation.get() != expectedGeneration) return@Thread
+                val context = module.currentContext()
+                if (context != null) {
+                    PinTaskRuntimeTraceReporter.record(
+                        context = context,
+                        stage = PinTaskRuntimeTrace.STAGE_SYSTEMUI_READY,
+                        detail = "SystemUI injected; hooks=" + hookCount
+                    )
+                    return@Thread
+                }
+                SystemClock.sleep(250L)
+            }
+        }, "LauncherStabilityFluidReady").apply {
+            isDaemon = true
+            priority = Thread.NORM_PRIORITY - 1
+            start()
+        }
     }
 
     private fun bootstrapPrefs(
