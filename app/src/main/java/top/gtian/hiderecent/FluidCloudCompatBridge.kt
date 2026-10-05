@@ -1,9 +1,11 @@
 package top.gtian.hiderecent
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.graphics.drawable.Icon
 import android.os.Binder
 import android.os.Bundle
@@ -329,14 +331,22 @@ internal object FluidCloudCompatBridge {
                             "keys=${result?.keySet()?.sorted()}"
                     )
 
-                    if (legacyMethod == METHOD_UNPIN &&
-                        resultCode != 0
-                    ) {
-                        val taskId =
-                            legacyExtras.getInt("taskId", -1)
-                        if (taskId >= 0) {
+                    val taskId =
+                        legacyExtras.getInt("taskId", -1)
+
+                    if (legacyMethod == METHOD_PIN) {
+                        if (resultCode == 0 && taskId >= 0) {
+                            // buildPinTranslation creates the deterministic record before
+                            // dispatch so cancel can reuse the exact SBN key. Drop it if the
+                            // downstream send failed; never leave a false local pin state.
                             pinsByTaskId.remove(taskId)
                         }
+                    } else if (
+                        legacyMethod == METHOD_UNPIN &&
+                        resultCode != 0 &&
+                        taskId >= 0
+                    ) {
+                        pinsByTaskId.remove(taskId)
                     }
 
                     result
@@ -442,12 +452,28 @@ internal object FluidCloudCompatBridge {
         val taskId = legacy.getInt("taskId", -1)
         if (taskId < 0) return null
 
-        val record = pinsByTaskId[taskId]
+        val record =
+            pinsByTaskId[taskId]
+                ?: reconstructPinRecord(
+                    module = module,
+                    taskId = taskId,
+                    legacy = legacy
+                )?.also {
+                    pinsByTaskId[taskId] = it
+                    module.log(
+                        Log.INFO,
+                        TAG,
+                        "reconstructed PinTask cancel record after cache miss " +
+                            "taskId=$taskId pkg=${it.packageName}"
+                    )
+                }
+
         if (record == null) {
             module.log(
                 Log.WARN,
                 TAG,
-                "cancel requested but no synthetic SBN cached for taskId=$taskId"
+                "cancel requested but PinTask identity cannot be reconstructed " +
+                    "for taskId=$taskId; pass-through"
             )
             return null
         }
@@ -456,6 +482,129 @@ internal object FluidCloudCompatBridge {
             putParcelable(KEY_CONTENT, record.sbn)
         }
     }
+
+    /**
+     * SystemUI can restart independently from Launcher. The legacy unpin Bundle only carries
+     * taskId/from/orientation, so the in-memory synthetic SBN cache may be gone even though the
+     * task is still pinned. Recover the deterministic SBN identity from RunningTaskInfo.
+     *
+     * This is read-only recovery: no task/window state is changed here.
+     */
+    private fun reconstructPinRecord(
+        module: Main,
+        taskId: Int,
+        legacy: Bundle
+    ): PinRecord? {
+        val context = module.currentContext() ?: return null
+        val activityManager =
+            context.getSystemService(ActivityManager::class.java)
+                ?: return null
+
+        @Suppress("DEPRECATION")
+        val taskInfo = runCatching {
+            activityManager.getRunningTasks(128)
+                .firstOrNull { it.id == taskId }
+        }.getOrNull() ?: return null
+
+        val packageName =
+            taskInfo.baseActivity?.packageName
+                ?: taskInfo.topActivity?.packageName
+                ?: taskInfo.baseIntent?.component?.packageName
+                ?: return null
+
+        val userId = readTaskUserId(taskInfo)
+        val uid = resolvePackageUidForUser(
+            context = context,
+            packageName = packageName,
+            userId = userId
+        )
+        val label = resolveAppLabel(context, packageName)
+
+        val pinInfo = Bundle(legacy).apply {
+            putInt("taskId", taskId)
+            putString("packageName", packageName)
+            putInt("userId", userId)
+            putInt("uid", uid)
+            putInt("pid", 0)
+            putParcelable("baseIntent", taskInfo.baseIntent)
+
+            if (!containsKey("componentName")) {
+                taskInfo.baseIntent?.component
+                    ?.flattenToString()
+                    ?.let { putString("componentName", it) }
+            }
+            if (!containsKey("serviceTitleName")) {
+                putString("serviceTitleName", label)
+            }
+            if (!containsKey("title")) {
+                putString("title", label)
+            }
+            if (!containsKey("des")) {
+                putString("des", label)
+            }
+        }
+
+        val notification = buildSyntheticNotification(
+            context = context,
+            packageName = packageName,
+            title = label,
+            pinInfo = pinInfo
+        )
+
+        @Suppress("DEPRECATION")
+        val sbn = StatusBarNotification(
+            packageName,
+            packageName,
+            taskId,
+            "launcher_pin_task_$taskId",
+            uid,
+            0,
+            0,
+            notification,
+            resolveUserHandle(userId),
+            System.currentTimeMillis()
+        )
+
+        return PinRecord(
+            taskId = taskId,
+            packageName = packageName,
+            sbn = sbn
+        )
+    }
+
+    private fun readTaskUserId(
+        taskInfo: ActivityManager.RunningTaskInfo
+    ): Int =
+        runCatching {
+            val field = taskInfo.javaClass
+                .superclass
+                ?.getField("userId")
+                ?: taskInfo.javaClass.getField("userId")
+            (field.get(taskInfo) as? Number)?.toInt()
+                ?: UserHandle.myUserId()
+        }.getOrDefault(UserHandle.myUserId())
+
+    private fun resolvePackageUidForUser(
+        context: Context,
+        packageName: String,
+        userId: Int
+    ): Int =
+        runCatching {
+            val method = PackageManager::class.java.getMethod(
+                "getPackageUidAsUser",
+                String::class.java,
+                Int::class.javaPrimitiveType
+            )
+            (method.invoke(
+                context.packageManager,
+                packageName,
+                userId
+            ) as? Number)?.toInt() ?: -1
+        }.recoverCatching {
+            context.packageManager
+                .getApplicationInfo(packageName, 0)
+                .uid
+        }.getOrDefault(-1)
 
     private fun buildSyntheticNotification(
         context: Context,
