@@ -26,6 +26,7 @@ import com.google.android.material.textfield.TextInputLayout
 import top.gtian.hiderecent.ColorOSChainHealth
 import top.gtian.hiderecent.LauncherHapticProfile
 import top.gtian.hiderecent.LauncherStabilityPrefs
+import top.gtian.hiderecent.PinTaskRuntimeTrace
 import top.gtian.hiderecent.R
 import kotlin.math.round
 import kotlin.math.roundToInt
@@ -262,6 +263,109 @@ class LauncherStabilityActivity : AppCompatActivity() {
             container.addView(row)
         }
 
+        container.addView(
+            TextView(this).apply {
+                text = getString(R.string.pin_trace_title)
+                textSize = 14f
+                setTextColor(
+                    MaterialColors.getColor(
+                        this@LauncherStabilityActivity,
+                        MaterialR.attr.colorPrimary,
+                        Color.DKGRAY
+                    )
+                )
+                setPadding(0, dp(18), 0, dp(4))
+            }
+        )
+
+        PinTaskRuntimeTrace.read(this).items.forEach { item ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(0, dp(8), 0, dp(8))
+            }
+
+            val textGroup = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+            row.addView(
+                textGroup,
+                LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+            )
+
+            textGroup.addView(
+                TextView(this).apply {
+                    text = pinTraceLabel(item.id)
+                    textSize = 14f
+                    setTextColor(
+                        MaterialColors.getColor(
+                            this@LauncherStabilityActivity,
+                            MaterialR.attr.colorOnSurface,
+                            Color.DKGRAY
+                        )
+                    )
+                }
+            )
+
+            val detail = if (item.hit) {
+                val ageSec = (
+                    (System.currentTimeMillis() - item.at)
+                        .coerceAtLeast(0L) / 1000L
+                    )
+                getString(
+                    R.string.pin_trace_detail_hit,
+                    formatTraceAge(ageSec),
+                    item.detail
+                )
+            } else {
+                getString(R.string.pin_trace_detail_waiting)
+            }
+
+            textGroup.addView(
+                TextView(this).apply {
+                    text = detail
+                    textSize = 12f
+                    setTextColor(
+                        MaterialColors.getColor(
+                            this@LauncherStabilityActivity,
+                            MaterialR.attr.colorOnSurfaceVariant,
+                            Color.GRAY
+                        )
+                    )
+                }
+            )
+
+            row.addView(
+                TextView(this).apply {
+                    text = getString(
+                        if (item.hit) {
+                            R.string.pin_trace_hit
+                        } else {
+                            R.string.pin_trace_waiting
+                        }
+                    )
+                    textSize = 13f
+                    setTextColor(
+                        MaterialColors.getColor(
+                            this@LauncherStabilityActivity,
+                            if (item.hit) {
+                                MaterialR.attr.colorPrimary
+                            } else {
+                                MaterialR.attr.colorOnSurfaceVariant
+                            },
+                            Color.DKGRAY
+                        )
+                    )
+                }
+            )
+
+            container.addView(row)
+        }
+
         val refresh = MaterialButton(
             this,
             null,
@@ -284,6 +388,32 @@ class LauncherStabilityActivity : AppCompatActivity() {
             }
         )
     }
+
+    private fun pinTraceLabel(id: String): String =
+        getString(
+            when (id) {
+                PinTaskRuntimeTrace.STAGE_LAUNCHER ->
+                    R.string.pin_trace_launcher
+                PinTaskRuntimeTrace.STAGE_SYSTEMUI ->
+                    R.string.pin_trace_systemui
+                PinTaskRuntimeTrace.STAGE_ATHENA_LIST ->
+                    R.string.pin_trace_athena_list
+                PinTaskRuntimeTrace.STAGE_ATHENA_MATCH ->
+                    R.string.pin_trace_athena_match
+                else ->
+                    R.string.chain_health_unknown
+            }
+        )
+
+    private fun formatTraceAge(seconds: Long): String =
+        when {
+            seconds < 60L ->
+                getString(R.string.pin_trace_age_seconds, seconds)
+            seconds < 3600L ->
+                getString(R.string.pin_trace_age_minutes, seconds / 60L)
+            else ->
+                getString(R.string.pin_trace_age_hours, seconds / 3600L)
+        }
 
     private fun chainHealthLabel(id: String): String =
         getString(
