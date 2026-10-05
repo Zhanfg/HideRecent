@@ -1,4 +1,4 @@
-# ColorOS 17 launcher / sidebar / SystemUI plus one exact system_server
+# ColorOS 17 launcher / sidebar / SystemUI / Athena plus one exact system_server
 # FlexibleWindow corner fallback. All system-server behavior is pass-through until
 # the Flexible Window master switch is enabled.
 android
@@ -6,3 +6,4 @@ system
 com.android.launcher
 com.coloros.smartsidebar
 com.android.systemui
+com.oplus.athena
