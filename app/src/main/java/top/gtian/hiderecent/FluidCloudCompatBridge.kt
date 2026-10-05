@@ -15,6 +15,8 @@ import android.os.UserHandle
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import io.github.libxposed.api.XposedInterface
+import org.json.JSONArray
+import org.json.JSONObject
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -52,7 +54,13 @@ internal object FluidCloudCompatBridge {
     private const val METHOD_CANCEL = "cancelLiveAlert"
     private const val KEY_CONTENT = "content"
     private const val KEY_PIN_INFO = "oplus.pinTaskInfo"
+    private const val KEY_LIVE_ALERT_OPTIONS = "oplusLiveAlertOptions"
     private const val KEY_RESULT = "resultCode"
+
+    // Exact legacy PinTask identity from SystemUIPlugin 16.000.002.
+    private const val PIN_NOTIFICATION_CHANNEL = "oplus_pin_task"
+    private const val PIN_NOTIFICATION_ID = 20_000
+    private const val OPLUS_PIN_INTENT_FLAG = 0x800
 
     private data class Config(
         val enabled: Boolean = false
@@ -362,45 +370,69 @@ internal object FluidCloudCompatBridge {
         legacy: Bundle
     ): Pair<String, Bundle>? {
         val taskId = legacy.getInt("taskId", -1)
-        val packageName = legacy.getString("packageName")
-            ?.takeIf { it.isNotBlank() }
-            ?: return null
-        val userId = legacy.getInt("userId", 0)
-        val uid = legacy.getInt("uid", -1)
-        val pid = legacy.getInt("pid", 0)
-
         if (taskId < 0) return null
 
         val context = module.currentContext()
             ?: return null
+        val activityManager =
+            context.getSystemService(ActivityManager::class.java)
 
-        val pinInfo = Bundle(legacy)
-        val label = resolveAppLabel(context, packageName)
-
-        if (!pinInfo.containsKey("serviceTitleName")) {
-            pinInfo.putString("serviceTitleName", label)
-        }
-        if (!pinInfo.containsKey("title")) {
-            pinInfo.putString("title", label)
-        }
-        if (!pinInfo.containsKey("des")) {
-            pinInfo.putString("des", label)
+        val taskInfo = activityManager?.let {
+            findTaskInfo(it, taskId)
         }
 
-        val baseIntent = runCatching {
+        val rawBaseIntent = runCatching {
             @Suppress("DEPRECATION")
             legacy.getParcelable("baseIntent") as? Intent
-        }.getOrNull()
+        }.getOrNull() ?: taskInfo?.baseIntent
 
-        if (!pinInfo.containsKey("componentName")) {
-            baseIntent?.component
-                ?.flattenToString()
-                ?.let {
-                    pinInfo.putString(
-                        "componentName",
-                        it
-                    )
-                }
+        val packageName =
+            legacy.getString("packageName")
+                ?.takeIf { it.isNotBlank() }
+                ?: rawBaseIntent?.component?.packageName
+                ?: taskInfo?.baseActivity?.packageName
+                ?: taskInfo?.topActivity?.packageName
+                ?: return null
+
+        val userId = if (legacy.containsKey("userId")) {
+            legacy.getInt("userId", 0)
+        } else {
+            taskInfo?.let(::readTaskUserId) ?: 0
+        }
+
+        val uid = legacy.getInt("uid", -1)
+            .takeIf { it >= 0 }
+            ?: resolvePackageUidForUser(
+                context = context,
+                packageName = packageName,
+                userId = userId
+            ).takeIf { it >= 0 }
+            ?: return null
+
+        val pid = legacy.getInt("pid", 0)
+        val label = resolveAppLabel(context, packageName)
+
+        val baseIntent = rawBaseIntent
+            ?.let(::cloneWithPinTaskFlag)
+
+        val launcherIntent = context.packageManager
+            .getLaunchIntentForPackage(packageName)
+            ?.let(::cloneWithPinTaskFlag)
+
+        // Keep the exact old oplus.pinTaskInfo payload shape. Do not leak the
+        // outer provider's orientation/from fields into Notification extras.
+        val pinInfo = Bundle().apply {
+            putInt("taskId", taskId)
+            putString("packageName", packageName)
+            if (baseIntent != null) {
+                putParcelable("baseIntent", baseIntent)
+            }
+            if (launcherIntent != null) {
+                putParcelable("launcherIntent", launcherIntent)
+            }
+            putInt("userId", userId)
+            putInt("uid", uid)
+            putInt("pid", pid)
         }
 
         val notification = buildSyntheticNotification(
@@ -414,8 +446,8 @@ internal object FluidCloudCompatBridge {
         val sbn = StatusBarNotification(
             packageName,
             packageName,
-            taskId,
-            "launcher_pin_task_$taskId",
+            PIN_NOTIFICATION_ID,
+            taskId.toString(),
             uid,
             pid,
             0,
@@ -434,6 +466,19 @@ internal object FluidCloudCompatBridge {
             putParcelable(KEY_CONTENT, sbn)
         }
     }
+
+    private fun cloneWithPinTaskFlag(source: Intent): Intent {
+        val copy = Intent(source)
+        runCatching {
+            val method = Intent::class.java.getMethod(
+                "addOplusFlags",
+                Int::class.javaPrimitiveType
+            )
+            method.invoke(copy, OPLUS_PIN_INTENT_FLAG)
+        }
+        return copy
+    }
+
 
     private fun resolveUserHandle(userId: Int): UserHandle =
         runCatching {
@@ -520,28 +565,24 @@ internal object FluidCloudCompatBridge {
         ).takeIf { it >= 0 } ?: return null
         val label = resolveAppLabel(context, packageName)
 
-        val pinInfo = Bundle(legacy).apply {
+        val baseIntent = taskInfo.baseIntent
+            ?.let(::cloneWithPinTaskFlag)
+        val launcherIntent = context.packageManager
+            .getLaunchIntentForPackage(packageName)
+            ?.let(::cloneWithPinTaskFlag)
+
+        val pinInfo = Bundle().apply {
             putInt("taskId", taskId)
             putString("packageName", packageName)
+            if (baseIntent != null) {
+                putParcelable("baseIntent", baseIntent)
+            }
+            if (launcherIntent != null) {
+                putParcelable("launcherIntent", launcherIntent)
+            }
             putInt("userId", userId)
             putInt("uid", uid)
             putInt("pid", 0)
-            putParcelable("baseIntent", taskInfo.baseIntent)
-
-            if (!containsKey("componentName")) {
-                taskInfo.baseIntent?.component
-                    ?.flattenToString()
-                    ?.let { putString("componentName", it) }
-            }
-            if (!containsKey("serviceTitleName")) {
-                putString("serviceTitleName", label)
-            }
-            if (!containsKey("title")) {
-                putString("title", label)
-            }
-            if (!containsKey("des")) {
-                putString("des", label)
-            }
         }
 
         val notification = buildSyntheticNotification(
@@ -555,8 +596,8 @@ internal object FluidCloudCompatBridge {
         val sbn = StatusBarNotification(
             packageName,
             packageName,
-            taskId,
-            "launcher_pin_task_$taskId",
+            PIN_NOTIFICATION_ID,
+            taskId.toString(),
             uid,
             0,
             0,
@@ -571,6 +612,7 @@ internal object FluidCloudCompatBridge {
             sbn = sbn
         )
     }
+
 
     @Suppress("DEPRECATION")
     private fun findTaskInfo(
@@ -652,8 +694,32 @@ internal object FluidCloudCompatBridge {
             packageName
         )
 
+        val liveAlertOptions = JSONObject().apply {
+            put("isMilestone", true)
+            put("dataSourcePkgName", packageName)
+            put("remindType", 0)
+            put(
+                "showHostMap",
+                JSONArray().apply {
+                    put(1)
+                    put(16)
+                }
+            )
+            put("lockScreenShowHostMap", JSONArray())
+            put(
+                "extensibleActionMap",
+                JSONObject().apply {
+                    put("service_from", 3)
+                    put("quitHideOrBubble", 0)
+                }
+            )
+        }.toString()
+
         @Suppress("DEPRECATION")
-        return Notification.Builder(context)
+        return Notification.Builder(
+            context,
+            PIN_NOTIFICATION_CHANNEL
+        )
             .setSmallIcon(icon)
             .setContentTitle(title)
             .setContentText(title)
@@ -663,6 +729,10 @@ internal object FluidCloudCompatBridge {
                 extras.putBundle(
                     KEY_PIN_INFO,
                     pinInfo
+                )
+                extras.putString(
+                    KEY_LIVE_ALERT_OPTIONS,
+                    liveAlertOptions
                 )
                 extras.putCharSequence(
                     Notification.EXTRA_TITLE,
@@ -674,6 +744,7 @@ internal object FluidCloudCompatBridge {
                 )
             }
     }
+
 
     private fun resolveAppLabel(
         context: Context,
