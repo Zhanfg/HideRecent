@@ -636,21 +636,6 @@ class LauncherStabilityActivity : AppCompatActivity() {
             280
         ) { "$it ms" }
 
-        addSection(container, getString(R.string.flex_canvas_section))
-        addSwitch(
-            container,
-            getString(R.string.flex_resize_dedup),
-            LauncherStabilityPrefs.KEY_FLEX_RESIZE_DEDUP,
-            getString(R.string.flex_resize_dedup_desc)
-        )
-        addIntSlider(
-            container,
-            getString(R.string.flex_resize_dedup_ms),
-            LauncherStabilityPrefs.KEY_FLEX_RESIZE_DEDUP_MS,
-            4,
-            40,
-            16
-        ) { "$it ms" }
     }
 
     private fun buildAnimationFeatures(container: LinearLayout) {
