@@ -73,7 +73,11 @@ class Main : XposedModule() {
     }
 
     override fun onSystemServerStarting(param: SystemServerStartingParam) {
-        // Deliberately empty: this branch never injects stability code into system_server.
+        runCatching {
+            SystemWindowCornerBridge.hook(this, param.classLoader)
+        }.onFailure {
+            log(Log.ERROR, TAG, "system window-corner bridge failed", it)
+        }
     }
 
     override fun onPackageLoaded(param: PackageLoadedParam) {
@@ -122,6 +126,7 @@ class Main : XposedModule() {
         LauncherStabilityHook.prepareHotReload()
         FlexibleWindowBridge.prepareHotReload()
         FluidCloudCompatBridge.prepareHotReload()
+        SystemWindowCornerBridge.prepareHotReload()
         return true
     }
 
@@ -133,8 +138,21 @@ class Main : XposedModule() {
 
         oldHandles.forEach { runCatching { it.unhook() } }
 
+        if (param.isSystemServer) {
+            if (loader != null) {
+                runCatching {
+                    SystemWindowCornerBridge.hook(this, loader)
+                }.onFailure {
+                    log(Log.ERROR, TAG, "hot reload system corner rehook failed", it)
+                }
+            } else {
+                log(Log.WARN, TAG, "hot reload system corner skipped: classloader unavailable")
+            }
+            return
+        }
+
+        if (loader == null) return
         val processPackage = param.processName.substringBefore(':')
-        if (param.isSystemServer || loader == null) return
 
         when (processPackage) {
             LAUNCHER_PKG -> runCatching {
