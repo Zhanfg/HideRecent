@@ -23,6 +23,7 @@ import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.slider.Slider
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.android.material.textfield.TextInputLayout
+import top.gtian.hiderecent.ColorOSChainHealth
 import top.gtian.hiderecent.LauncherHapticProfile
 import top.gtian.hiderecent.LauncherStabilityPrefs
 import top.gtian.hiderecent.R
@@ -52,6 +53,10 @@ class LauncherStabilityActivity : AppCompatActivity() {
         applyInsets()
 
         bindDynamicColor(findViewById(R.id.switchUseDynamicColor))
+        buildChainHealth(
+            findViewById(R.id.chainHealthContainer),
+            findViewById(R.id.chainHealthSummary)
+        )
 
         bind(
             findViewById(R.id.switchHapticEffects),
@@ -150,6 +155,148 @@ class LauncherStabilityActivity : AppCompatActivity() {
             prefs.edit().putBoolean(key, checked).apply()
         }
     }
+
+    private fun buildChainHealth(
+        container: LinearLayout,
+        summary: TextView
+    ) {
+        container.removeAllViews()
+
+        val snapshot = ColorOSChainHealth.inspect(this)
+        summary.text = if (snapshot.allCriticalHealthy) {
+            getString(
+                R.string.chain_health_summary_ok,
+                snapshot.healthyCount,
+                snapshot.totalCount
+            )
+        } else {
+            getString(
+                R.string.chain_health_summary_partial,
+                snapshot.healthyCount,
+                snapshot.totalCount
+            )
+        }
+        summary.setTextColor(
+            MaterialColors.getColor(
+                this,
+                if (snapshot.allCriticalHealthy) {
+                    MaterialR.attr.colorPrimary
+                } else {
+                    MaterialR.attr.colorError
+                },
+                Color.DKGRAY
+            )
+        )
+
+        snapshot.items.forEach { item ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(0, dp(10), 0, dp(10))
+            }
+
+            val textGroup = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+            row.addView(
+                textGroup,
+                LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+            )
+
+            textGroup.addView(
+                TextView(this).apply {
+                    text = chainHealthLabel(item.id)
+                    textSize = 14f
+                    setTextColor(
+                        MaterialColors.getColor(
+                            this@LauncherStabilityActivity,
+                            MaterialR.attr.colorOnSurface,
+                            Color.DKGRAY
+                        )
+                    )
+                }
+            )
+
+            textGroup.addView(
+                TextView(this).apply {
+                    text = item.detail
+                    textSize = 12f
+                    setTextColor(
+                        MaterialColors.getColor(
+                            this@LauncherStabilityActivity,
+                            MaterialR.attr.colorOnSurfaceVariant,
+                            Color.GRAY
+                        )
+                    )
+                }
+            )
+
+            row.addView(
+                TextView(this).apply {
+                    text = getString(
+                        if (item.available) {
+                            R.string.chain_health_available
+                        } else {
+                            R.string.chain_health_missing
+                        }
+                    )
+                    textSize = 13f
+                    setTextColor(
+                        MaterialColors.getColor(
+                            this@LauncherStabilityActivity,
+                            if (item.available) {
+                                MaterialR.attr.colorPrimary
+                            } else {
+                                MaterialR.attr.colorError
+                            },
+                            Color.DKGRAY
+                        )
+                    )
+                }
+            )
+
+            container.addView(row)
+        }
+
+        val refresh = MaterialButton(
+            this,
+            null,
+            MaterialR.attr.materialButtonOutlinedStyle
+        ).apply {
+            text = getString(R.string.chain_health_refresh)
+            isAllCaps = false
+            cornerRadius = dp(18)
+            setOnClickListener {
+                buildChainHealth(container, summary)
+            }
+        }
+        container.addView(
+            refresh,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(48)
+            ).apply {
+                topMargin = dp(8)
+            }
+        )
+    }
+
+    private fun chainHealthLabel(id: String): String =
+        getString(
+            when (id) {
+                "fluid_cloud" -> R.string.chain_health_fluid_cloud
+                "flex_ui" -> R.string.chain_health_flexible_ui
+                "smart_sidebar" -> R.string.chain_health_smart_sidebar
+                "seedling" -> R.string.chain_health_seedling
+                "pantanal" -> R.string.chain_health_pantanal
+                "athena" -> R.string.chain_health_athena
+                else -> R.string.chain_health_unknown
+            }
+        )
 
     private fun buildHapticProfiles(container: LinearLayout) {
         addProfileDropdown(
