@@ -31,6 +31,12 @@
         </activity>
 
         <provider
+            android:name=".PinTaskRuntimeTraceProvider"
+            android:authorities="cc.axymorrsen.launcherstability.runtime"
+            android:exported="true"
+            android:grantUriPermissions="false" />
+
+        <provider
             android:name="io.github.libxposed.service.XposedProvider"
             android:authorities="${applicationId}.XposedService"
             android:exported="true" />
